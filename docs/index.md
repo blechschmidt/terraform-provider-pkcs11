@@ -16,6 +16,7 @@ Terraform provider for managing cryptographic objects on PKCS#11 tokens and HSMs
 
 ### Optional
 
+- `env` (Map of String) Additional environment variables to set for the provider process. This can be used to pass configuration to the PKCS#11 module or for debugging purposes. Values will override any conflicting environment variables set in the shell.
 - `module_path` (String) Path to the PKCS#11 shared library module. Can also be set via PKCS11_MODULE_PATH env var.
 - `pin` (String, Sensitive) User PIN for the token. Can also be set via PKCS11_PIN env var.
 - `slot_id` (Number) Slot ID to use. Mutually exclusive with token_label. Can also be set via PKCS11_SLOT_ID env var.

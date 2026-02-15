@@ -35,6 +35,7 @@ type Pkcs11ProviderModel struct {
 	SlotID     types.Int64  `tfsdk:"slot_id"`
 	Pin        types.String `tfsdk:"pin"`
 	SoPin      types.String `tfsdk:"so_pin"`
+	Env        types.Map    `tfsdk:"env"`
 }
 
 // New creates a factory function for the provider.
@@ -75,6 +76,11 @@ func (p *Pkcs11Provider) Schema(_ context.Context, _ provider.SchemaRequest, res
 				Optional:    true,
 				Sensitive:   true,
 			},
+			"env": schema.MapAttribute{
+				Description: "Additional environment variables to set for the provider process. This can be used to pass configuration to the PKCS#11 module or for debugging purposes. Values will override any conflicting environment variables set in the shell.",
+				Optional:    true,
+				ElementType: types.StringType,
+			},
 		},
 	}
 }
@@ -91,6 +97,11 @@ func (p *Pkcs11Provider) Configure(ctx context.Context, req provider.ConfigureRe
 	tokenLabel := stringValueOrEnv(config.TokenLabel, "PKCS11_TOKEN_LABEL")
 	pin := stringValueOrEnv(config.Pin, "PKCS11_PIN")
 	soPin := stringValueOrEnv(config.SoPin, "PKCS11_SO_PIN")
+
+	for k, v := range config.Env.Elements() {
+		value := v.(types.String).ValueString()
+		os.Setenv(k, value)
+	}
 
 	if modulePath == "" {
 		resp.Diagnostics.AddError("Missing module_path", "module_path must be set in provider config or PKCS11_MODULE_PATH env var")

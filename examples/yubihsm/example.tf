@@ -15,6 +15,9 @@ provider "pkcs11" {
   module_path = "/usr/lib/pkcs11/yubihsm_pkcs11.so"
   slot_id     = 0
   pin         = var.pkcs11_pin
+  env = {
+    "YUBIHSM_PKCS11_CONF" : "/etc/yubihsm_pkcs11.conf"
+  }
 }
 
 # Query token information
@@ -45,12 +48,12 @@ resource "pkcs11_key_pair" "signing" {
     public_exponent = "010001" # 65537 (in base64)
   }
   private_key = {
-    key_type        = data.pkcs11_constants.constants.all["CKK_RSA"]
-    class           = data.pkcs11_constants.constants.all["CKO_PRIVATE_KEY"]
-    sign            = true
-    decrypt         = true
-    token           = true
-    label           = "test-signing-key"
+    key_type = data.pkcs11_constants.constants.all["CKK_RSA"]
+    class    = data.pkcs11_constants.constants.all["CKO_PRIVATE_KEY"]
+    sign     = true
+    decrypt  = true
+    token    = true
+    label    = "test-signing-key"
   }
 }
 
