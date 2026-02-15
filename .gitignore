@@ -2,3 +2,5 @@ yubihsm-test
 pkcs11-spec-v3.1-os.pdf
 terraform-provider-pkcs11
 .claude
+tools
+bin/
