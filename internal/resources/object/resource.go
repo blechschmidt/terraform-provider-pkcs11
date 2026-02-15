@@ -81,7 +81,7 @@ func (r *ObjectResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State, shared.AttrTypesFrom(pkcsAttrs))
+	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -97,13 +97,7 @@ func (r *ObjectResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	stateAttrs, diags := shared.AttrsFromState(ctx, req.State)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State, shared.AttrTypesFrom(stateAttrs))
+	diags := shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -154,7 +148,7 @@ func (r *ObjectResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 	}
 
-	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State, shared.AttrTypesFrom(planAttrs))
+	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

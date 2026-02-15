@@ -113,7 +113,7 @@ func (r *KeyPairResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	diags = r.readBothKeysIntoState(ctx, pubHandle, privHandle, &resp.State, shared.AttrTypesFrom(pubAttrs), shared.AttrTypesFrom(privAttrs))
+	diags = r.readBothKeysIntoState(ctx, pubHandle, privHandle, &resp.State)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -130,19 +130,7 @@ func (r *KeyPairResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	pubStateAttrs, diags := shared.AttrsFromNestedState(ctx, req.State, "public_key")
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	privStateAttrs, diags := shared.AttrsFromNestedState(ctx, req.State, "private_key")
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	diags = r.readBothKeysIntoState(ctx, pubHandle, privHandle, &resp.State, shared.AttrTypesFrom(pubStateAttrs), shared.AttrTypesFrom(privStateAttrs))
+	diags := r.readBothKeysIntoState(ctx, pubHandle, privHandle, &resp.State)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -198,7 +186,7 @@ func (r *KeyPairResource) Update(ctx context.Context, req resource.UpdateRequest
 		}
 	}
 
-	diags = r.readBothKeysIntoState(ctx, pubHandle, privHandle, &resp.State, shared.AttrTypesFrom(pubPlanAttrs), shared.AttrTypesFrom(privPlanAttrs))
+	diags = r.readBothKeysIntoState(ctx, pubHandle, privHandle, &resp.State)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -258,15 +246,15 @@ func (r *KeyPairResource) findBothKeys(ctx context.Context, state tfsdk.State) (
 }
 
 // readBothKeysIntoState reads attributes from both keys into their respective nested state blocks.
-func (r *KeyPairResource) readBothKeysIntoState(ctx context.Context, pubHandle, privHandle pkcs11.ObjectHandle, state *tfsdk.State, pubQueryTypes, privQueryTypes []uint) diag.Diagnostics {
+func (r *KeyPairResource) readBothKeysIntoState(ctx context.Context, pubHandle, privHandle pkcs11.ObjectHandle, state *tfsdk.State) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	diags.Append(shared.ReadObjectIntoNestedState(ctx, r.client, pubHandle, state, "public_key", pubQueryTypes)...)
+	diags.Append(shared.ReadObjectIntoNestedState(ctx, r.client, pubHandle, state, "public_key")...)
 	if diags.HasError() {
 		return diags
 	}
 
-	diags.Append(shared.ReadObjectIntoNestedState(ctx, r.client, privHandle, state, "private_key", privQueryTypes)...)
+	diags.Append(shared.ReadObjectIntoNestedState(ctx, r.client, privHandle, state, "private_key")...)
 	return diags
 }
 

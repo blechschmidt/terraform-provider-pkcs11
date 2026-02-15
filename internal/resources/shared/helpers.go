@@ -257,26 +257,22 @@ func AttributeValuesEqual(a, b *pkcs11.Attribute) bool {
 	return true
 }
 
-// ReadObjectIntoState queries the specified attributes from the token and writes them to state at root level.
-func ReadObjectIntoState(ctx context.Context, client *pkcs11client.Client, handle pkcs11.ObjectHandle, state *tfsdk.State, queryTypes []uint) diag.Diagnostics {
-	return readObjectIntoStateAt(ctx, client, handle, state, queryTypes, path.Root)
+// ReadObjectIntoState queries all readable attributes from the token and writes them to state at root level.
+func ReadObjectIntoState(ctx context.Context, client *pkcs11client.Client, handle pkcs11.ObjectHandle, state *tfsdk.State) diag.Diagnostics {
+	return readObjectIntoStateAt(ctx, client, handle, state, path.Root)
 }
 
-// ReadObjectIntoNestedState queries the specified attributes from the token and writes them to a nested block in state.
-func ReadObjectIntoNestedState(ctx context.Context, client *pkcs11client.Client, handle pkcs11.ObjectHandle, state *tfsdk.State, nestedKey string, queryTypes []uint) diag.Diagnostics {
-	return readObjectIntoStateAt(ctx, client, handle, state, queryTypes, func(key string) path.Path {
+// ReadObjectIntoNestedState queries all readable attributes from the token and writes them to a nested block in state.
+func ReadObjectIntoNestedState(ctx context.Context, client *pkcs11client.Client, handle pkcs11.ObjectHandle, state *tfsdk.State, nestedKey string) diag.Diagnostics {
+	return readObjectIntoStateAt(ctx, client, handle, state, func(key string) path.Path {
 		return path.Root(nestedKey).AtName(key)
 	})
 }
 
-func readObjectIntoStateAt(ctx context.Context, client *pkcs11client.Client, handle pkcs11.ObjectHandle, state *tfsdk.State, queryTypes []uint, pathFn func(string) path.Path) diag.Diagnostics {
+func readObjectIntoStateAt(ctx context.Context, client *pkcs11client.Client, handle pkcs11.ObjectHandle, state *tfsdk.State, pathFn func(string) path.Path) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	rawAttrs, err := client.GetObjectAttributes(handle, queryTypes)
-	if err != nil {
-		diags.AddError("Failed to read object attributes", err.Error())
-		return diags
-	}
+	rawAttrs := client.GetAllObjectAttributes(handle)
 
 	for _, def := range pkcs11client.ObjectAttrs {
 		val, ok := rawAttrs[def.Type]
