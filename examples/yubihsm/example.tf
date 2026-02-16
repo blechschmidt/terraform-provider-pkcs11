@@ -26,10 +26,8 @@ data "pkcs11_token_info" "current" {}
 # List supported mechanisms
 data "pkcs11_mechanisms" "all" {}
 
-data "pkcs11_constants" "constants" {}
-
 resource "pkcs11_object" "my_data" {
-  class = data.pkcs11_constants.constants.all["CKO_DATA"]
+  class = "CKO_DATA"
   label = "my-object"
   value = base64encode("hello word")
 }
@@ -38,8 +36,8 @@ resource "pkcs11_key_pair" "signing" {
   mechanism = "CKM_RSA_PKCS_KEY_PAIR_GEN"
 
   public_key = {
-    key_type        = data.pkcs11_constants.constants.all["CKK_RSA"]
-    class           = data.pkcs11_constants.constants.all["CKO_PUBLIC_KEY"]
+    key_type        = "CKK_RSA"
+    class           = "CKO_PUBLIC_KEY"
     token           = true
     verify          = true
     encrypt         = true
@@ -48,8 +46,8 @@ resource "pkcs11_key_pair" "signing" {
     public_exponent = "010001" # 65537 (in base64)
   }
   private_key = {
-    key_type = data.pkcs11_constants.constants.all["CKK_RSA"]
-    class    = data.pkcs11_constants.constants.all["CKO_PRIVATE_KEY"]
+    key_type = "CKK_RSA"
+    class    = "CKO_PRIVATE_KEY"
     sign     = true
     decrypt  = true
     token    = true
@@ -60,8 +58,8 @@ resource "pkcs11_key_pair" "signing" {
 resource "pkcs11_symmetric_key" "test_key" {
   mechanism   = "CKM_AES_KEY_GEN"
   label       = "test-symmetric-key"
-  class       = data.pkcs11_constants.constants.all["CKO_SECRET_KEY"]
-  key_type    = data.pkcs11_constants.constants.all["CKK_AES"]
+  class       = "CKO_SECRET_KEY"
+  key_type    = "CKK_AES"
   value_len   = 32
   encrypt     = true
   decrypt     = true

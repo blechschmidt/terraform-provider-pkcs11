@@ -16,6 +16,7 @@ Looks up a PKCS#11 object by attributes (CKA constants without CKA_prefix, lower
 # Look up an existing object by label
 data "pkcs11_object" "my_key" {
   label = "my-signing-key"
+  class = "CKO_PUBLIC_KEY"
 }
 
 # Look up an object that may or may not exist
@@ -42,12 +43,12 @@ output "object_exists" {
 - `base` (String) PKCS#11 attribute CKA_BASE
 - `bits_per_pixel` (Number) PKCS#11 attribute CKA_BITS_PER_PIXEL
 - `certificate_category` (Number) PKCS#11 attribute CKA_CERTIFICATE_CATEGORY
-- `certificate_type` (Number) PKCS#11 attribute CKA_CERTIFICATE_TYPE
+- `certificate_type` (String) PKCS#11 attribute CKA_CERTIFICATE_TYPE. Accepts constant name or numeric value.
 - `char_columns` (Number) PKCS#11 attribute CKA_CHAR_COLUMNS
 - `char_rows` (Number) PKCS#11 attribute CKA_CHAR_ROWS
 - `char_sets` (String) PKCS#11 attribute CKA_CHAR_SETS
 - `check_value` (String) PKCS#11 attribute CKA_CHECK_VALUE
-- `class` (Number) PKCS#11 attribute CKA_CLASS
+- `class` (String) PKCS#11 attribute CKA_CLASS. Accepts constant name or numeric value.
 - `coefficient` (String) PKCS#11 attribute CKA_COEFFICIENT
 - `color` (Boolean) PKCS#11 attribute CKA_COLOR
 - `copyable` (Boolean) PKCS#11 attribute CKA_COPYABLE
@@ -73,12 +74,12 @@ output "object_exists" {
 - `hw_feature_type` (Number) PKCS#11 attribute CKA_HW_FEATURE_TYPE
 - `issuer` (String) PKCS#11 attribute CKA_ISSUER
 - `java_midp_security_domain` (Number) PKCS#11 attribute CKA_JAVA_MIDP_SECURITY_DOMAIN
-- `key_gen_mechanism` (Number) PKCS#11 attribute CKA_KEY_GEN_MECHANISM
+- `key_gen_mechanism` (String) PKCS#11 attribute CKA_KEY_GEN_MECHANISM. Accepts constant name or numeric value.
 - `key_id` (String) PKCS#11 attribute CKA_KEY_ID
-- `key_type` (Number) PKCS#11 attribute CKA_KEY_TYPE
+- `key_type` (String) PKCS#11 attribute CKA_KEY_TYPE. Accepts constant name or numeric value.
 - `label` (String) PKCS#11 attribute CKA_LABEL
 - `local` (Boolean) PKCS#11 attribute CKA_LOCAL
-- `mechanism_type` (Number) PKCS#11 attribute CKA_MECHANISM_TYPE
+- `mechanism_type` (String) PKCS#11 attribute CKA_MECHANISM_TYPE. Accepts constant name or numeric value.
 - `mime_types` (String) PKCS#11 attribute CKA_MIME_TYPES
 - `modifiable` (Boolean) PKCS#11 attribute CKA_MODIFIABLE
 - `modulus` (String) PKCS#11 attribute CKA_MODULUS

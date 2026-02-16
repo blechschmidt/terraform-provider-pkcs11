@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/miekg/pkcs11"
 )
@@ -21,118 +22,161 @@ const (
 	AttrTypeUlong                  // CK_ULONG -> int64
 )
 
+type Pkcs11Enum struct {
+	Mapping map[string]uint
+	Prefix  string
+	reverse map[uint]string
+}
+
+// Resolve resolves an input string to a PKCS#11 constant value.
+// Accepts: full name ("CKO_SECRET_KEY"), without prefix ("SECRET_KEY"), or numeric string ("3").
+func (e *Pkcs11Enum) Resolve(input string) (uint, error) {
+	if id, ok := e.Mapping[input]; ok {
+		return id, nil
+	}
+	n, err := strconv.ParseUint(input, 10, 64)
+	if err == nil {
+		return uint(n), nil
+	}
+	return 0, fmt.Errorf("unknown %s value: %q", e.Prefix, input)
+}
+
+// Format converts a PKCS#11 constant value to its canonical string name.
+func (e *Pkcs11Enum) Format(id uint) string {
+	if e.reverse == nil {
+		e.reverse = make(map[uint]string, len(e.Mapping))
+		for name, v := range e.Mapping {
+			e.reverse[v] = name
+		}
+	}
+	if name, ok := e.reverse[id]; ok {
+		return name
+	}
+	return strconv.FormatUint(uint64(id), 10)
+}
+
 // AttrDef defines the mapping between a PKCS#11 attribute and its Terraform representation.
 type AttrDef struct {
-	Type      uint     // CKA_* constant
-	TFKey     string   // Terraform schema key
-	AttrType  AttrType // Value encoding
-	Immutable bool     // Requires replacement if changed
-	Sensitive bool     // Sensitive in Terraform
-	Computed  bool     // Computed by the token
-	ForceNew  bool     // Changes force new resource
+	Type       uint        // CKA_* constant
+	TFKey      string      // Terraform schema key
+	AttrType   AttrType    // Value encoding
+	Immutable  bool        // Requires replacement if changed
+	Sensitive  bool        // Sensitive in Terraform
+	Computed   bool        // Computed by the token
+	ForceNew   bool        // Changes force new resource
+	Pkcs11Enum *Pkcs11Enum // Optional enum mapping for CK_ULONG attributes
 }
 
 // Object attributes
 var ObjectAttrs = []AttrDef{
-	{pkcs11.CKA_CLASS, "class", AttrTypeUlong, true, false, true, false},
-	{pkcs11.CKA_TOKEN, "token", AttrTypeBool, true, false, false, true},
-	{pkcs11.CKA_PRIVATE, "private_flag", AttrTypeBool, true, false, false, true},
-	{pkcs11.CKA_LABEL, "label", AttrTypeString, false, false, false, false},
-	{pkcs11.CKA_APPLICATION, "application", AttrTypeString, false, false, false, false},
-	{pkcs11.CKA_VALUE, "value", AttrTypeBytes, false, true, false, false},
-	{pkcs11.CKA_OBJECT_ID, "object_id", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_CERTIFICATE_TYPE, "certificate_type", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_ISSUER, "issuer", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_SERIAL_NUMBER, "serial_number", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_AC_ISSUER, "ac_issuer", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_OWNER, "owner", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_ATTR_TYPES, "attr_types", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_TRUSTED, "trusted", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_CERTIFICATE_CATEGORY, "certificate_category", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_JAVA_MIDP_SECURITY_DOMAIN, "java_midp_security_domain", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_URL, "url", AttrTypeString, false, false, false, false},
-	{pkcs11.CKA_HASH_OF_SUBJECT_PUBLIC_KEY, "hash_of_subject_public_key", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_HASH_OF_ISSUER_PUBLIC_KEY, "hash_of_issuer_public_key", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_NAME_HASH_ALGORITHM, "name_hash_algorithm", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_CHECK_VALUE, "check_value", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_KEY_TYPE, "key_type", AttrTypeUlong, true, false, true, false},
-	{pkcs11.CKA_SUBJECT, "subject", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_ID, "key_id", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_SENSITIVE, "sensitive", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_ENCRYPT, "encrypt", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_DECRYPT, "decrypt", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_WRAP, "wrap", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_UNWRAP, "unwrap", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_SIGN, "sign", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_SIGN_RECOVER, "sign_recover", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_VERIFY, "verify", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_VERIFY_RECOVER, "verify_recover", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_DERIVE, "derive", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_START_DATE, "start_date", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_END_DATE, "end_date", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_MODULUS, "modulus", AttrTypeHex, false, false, false, false},
-	{pkcs11.CKA_MODULUS_BITS, "modulus_bits", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_PUBLIC_EXPONENT, "public_exponent", AttrTypeHex, false, false, false, false},
-	{pkcs11.CKA_PRIVATE_EXPONENT, "private_exponent", AttrTypeHex, false, true, false, false},
-	{pkcs11.CKA_PRIME_1, "prime_1", AttrTypeHex, false, true, false, false},
-	{pkcs11.CKA_PRIME_2, "prime_2", AttrTypeHex, false, true, false, false},
-	{pkcs11.CKA_EXPONENT_1, "exponent_1", AttrTypeHex, false, true, false, false},
-	{pkcs11.CKA_EXPONENT_2, "exponent_2", AttrTypeHex, false, true, false, false},
-	{pkcs11.CKA_COEFFICIENT, "coefficient", AttrTypeHex, false, true, false, false},
-	{pkcs11.CKA_PUBLIC_KEY_INFO, "public_key_info", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_PRIME, "prime", AttrTypeHex, false, false, false, false},
-	{pkcs11.CKA_SUBPRIME, "subprime", AttrTypeHex, false, false, false, false},
-	{pkcs11.CKA_BASE, "base", AttrTypeHex, false, false, false, false},
-	{pkcs11.CKA_PRIME_BITS, "prime_bits", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_SUBPRIME_BITS, "subprime_bits", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_VALUE_BITS, "value_bits", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_VALUE_LEN, "value_len", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_EXTRACTABLE, "extractable", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_LOCAL, "local", AttrTypeBool, false, false, true, false},
-	{pkcs11.CKA_NEVER_EXTRACTABLE, "never_extractable", AttrTypeBool, false, false, true, false},
-	{pkcs11.CKA_ALWAYS_SENSITIVE, "always_sensitive", AttrTypeBool, false, false, true, false},
-	{pkcs11.CKA_KEY_GEN_MECHANISM, "key_gen_mechanism", AttrTypeUlong, false, false, true, false},
-	{pkcs11.CKA_MODIFIABLE, "modifiable", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_COPYABLE, "copyable", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_DESTROYABLE, "destroyable", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_EC_PARAMS, "ec_params", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_EC_POINT, "ec_point", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_ALWAYS_AUTHENTICATE, "always_authenticate", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_WRAP_WITH_TRUSTED, "wrap_with_trusted", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_OTP_FORMAT, "otp_format", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_OTP_LENGTH, "otp_length", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_OTP_TIME_INTERVAL, "otp_time_interval", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_OTP_USER_FRIENDLY_MODE, "otp_user_friendly_mode", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_OTP_CHALLENGE_REQUIREMENT, "otp_challenge_requirement", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_OTP_TIME_REQUIREMENT, "otp_time_requirement", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_OTP_COUNTER_REQUIREMENT, "otp_counter_requirement", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_OTP_PIN_REQUIREMENT, "otp_pin_requirement", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_OTP_COUNTER, "otp_counter", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_OTP_TIME, "otp_time", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_OTP_USER_IDENTIFIER, "otp_user_identifier", AttrTypeString, false, false, false, false},
-	{pkcs11.CKA_OTP_SERVICE_IDENTIFIER, "otp_service_identifier", AttrTypeString, false, false, false, false},
-	{pkcs11.CKA_OTP_SERVICE_LOGO, "otp_service_logo", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_OTP_SERVICE_LOGO_TYPE, "otp_service_logo_type", AttrTypeString, false, false, false, false},
-	{pkcs11.CKA_GOSTR3410_PARAMS, "gostr3410_params", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_GOSTR3411_PARAMS, "gostr3411_params", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_GOST28147_PARAMS, "gost28147_params", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_HW_FEATURE_TYPE, "hw_feature_type", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_RESET_ON_INIT, "reset_on_init", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_HAS_RESET, "has_reset", AttrTypeBool, false, false, true, false},
-	{pkcs11.CKA_PIXEL_X, "pixel_x", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_PIXEL_Y, "pixel_y", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_RESOLUTION, "resolution", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_CHAR_ROWS, "char_rows", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_CHAR_COLUMNS, "char_columns", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_COLOR, "color", AttrTypeBool, false, false, false, false},
-	{pkcs11.CKA_BITS_PER_PIXEL, "bits_per_pixel", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_CHAR_SETS, "char_sets", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_ENCODING_METHODS, "encoding_methods", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_MIME_TYPES, "mime_types", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_MECHANISM_TYPE, "mechanism_type", AttrTypeUlong, false, false, false, false},
-	{pkcs11.CKA_REQUIRED_CMS_ATTRIBUTES, "required_cms_attributes", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_DEFAULT_CMS_ATTRIBUTES, "default_cms_attributes", AttrTypeBytes, false, false, false, false},
-	{pkcs11.CKA_SUPPORTED_CMS_ATTRIBUTES, "supported_cms_attributes", AttrTypeBytes, false, false, false, false},
+	{pkcs11.CKA_CLASS, "class", AttrTypeUlong, true, false, true, false, &Pkcs11Enum{
+		Mapping: ObjectClassNameToID,
+		Prefix:  "CKO_",
+	}},
+	{pkcs11.CKA_TOKEN, "token", AttrTypeBool, true, false, false, true, nil},
+	{pkcs11.CKA_PRIVATE, "private_flag", AttrTypeBool, true, false, false, true, nil},
+	{pkcs11.CKA_LABEL, "label", AttrTypeString, false, false, false, false, nil},
+	{pkcs11.CKA_APPLICATION, "application", AttrTypeString, false, false, false, false, nil},
+	{pkcs11.CKA_VALUE, "value", AttrTypeBytes, false, true, false, false, nil},
+	{pkcs11.CKA_OBJECT_ID, "object_id", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_CERTIFICATE_TYPE, "certificate_type", AttrTypeUlong, false, false, false, false, &Pkcs11Enum{
+		Mapping: CertTypeNameToID,
+		Prefix:  "CKC_",
+	}},
+	{pkcs11.CKA_ISSUER, "issuer", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_SERIAL_NUMBER, "serial_number", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_AC_ISSUER, "ac_issuer", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_OWNER, "owner", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_ATTR_TYPES, "attr_types", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_TRUSTED, "trusted", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_CERTIFICATE_CATEGORY, "certificate_category", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_JAVA_MIDP_SECURITY_DOMAIN, "java_midp_security_domain", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_URL, "url", AttrTypeString, false, false, false, false, nil},
+	{pkcs11.CKA_HASH_OF_SUBJECT_PUBLIC_KEY, "hash_of_subject_public_key", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_HASH_OF_ISSUER_PUBLIC_KEY, "hash_of_issuer_public_key", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_NAME_HASH_ALGORITHM, "name_hash_algorithm", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_CHECK_VALUE, "check_value", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_KEY_TYPE, "key_type", AttrTypeUlong, true, false, true, false, &Pkcs11Enum{
+		Mapping: KeyTypeNameToID,
+		Prefix:  "CKK_",
+	}},
+	{pkcs11.CKA_SUBJECT, "subject", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_ID, "key_id", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_SENSITIVE, "sensitive", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_ENCRYPT, "encrypt", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_DECRYPT, "decrypt", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_WRAP, "wrap", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_UNWRAP, "unwrap", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_SIGN, "sign", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_SIGN_RECOVER, "sign_recover", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_VERIFY, "verify", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_VERIFY_RECOVER, "verify_recover", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_DERIVE, "derive", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_START_DATE, "start_date", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_END_DATE, "end_date", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_MODULUS, "modulus", AttrTypeHex, false, false, false, false, nil},
+	{pkcs11.CKA_MODULUS_BITS, "modulus_bits", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_PUBLIC_EXPONENT, "public_exponent", AttrTypeHex, false, false, false, false, nil},
+	{pkcs11.CKA_PRIVATE_EXPONENT, "private_exponent", AttrTypeHex, false, true, false, false, nil},
+	{pkcs11.CKA_PRIME_1, "prime_1", AttrTypeHex, false, true, false, false, nil},
+	{pkcs11.CKA_PRIME_2, "prime_2", AttrTypeHex, false, true, false, false, nil},
+	{pkcs11.CKA_EXPONENT_1, "exponent_1", AttrTypeHex, false, true, false, false, nil},
+	{pkcs11.CKA_EXPONENT_2, "exponent_2", AttrTypeHex, false, true, false, false, nil},
+	{pkcs11.CKA_COEFFICIENT, "coefficient", AttrTypeHex, false, true, false, false, nil},
+	{pkcs11.CKA_PUBLIC_KEY_INFO, "public_key_info", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_PRIME, "prime", AttrTypeHex, false, false, false, false, nil},
+	{pkcs11.CKA_SUBPRIME, "subprime", AttrTypeHex, false, false, false, false, nil},
+	{pkcs11.CKA_BASE, "base", AttrTypeHex, false, false, false, false, nil},
+	{pkcs11.CKA_PRIME_BITS, "prime_bits", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_SUBPRIME_BITS, "subprime_bits", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_VALUE_BITS, "value_bits", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_VALUE_LEN, "value_len", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_EXTRACTABLE, "extractable", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_LOCAL, "local", AttrTypeBool, false, false, true, false, nil},
+	{pkcs11.CKA_NEVER_EXTRACTABLE, "never_extractable", AttrTypeBool, false, false, true, false, nil},
+	{pkcs11.CKA_ALWAYS_SENSITIVE, "always_sensitive", AttrTypeBool, false, false, true, false, nil},
+	{pkcs11.CKA_KEY_GEN_MECHANISM, "key_gen_mechanism", AttrTypeUlong, false, false, true, false, MechanismEnum},
+	{pkcs11.CKA_MODIFIABLE, "modifiable", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_COPYABLE, "copyable", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_DESTROYABLE, "destroyable", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_EC_PARAMS, "ec_params", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_EC_POINT, "ec_point", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_ALWAYS_AUTHENTICATE, "always_authenticate", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_WRAP_WITH_TRUSTED, "wrap_with_trusted", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_FORMAT, "otp_format", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_LENGTH, "otp_length", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_TIME_INTERVAL, "otp_time_interval", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_USER_FRIENDLY_MODE, "otp_user_friendly_mode", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_CHALLENGE_REQUIREMENT, "otp_challenge_requirement", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_TIME_REQUIREMENT, "otp_time_requirement", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_COUNTER_REQUIREMENT, "otp_counter_requirement", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_PIN_REQUIREMENT, "otp_pin_requirement", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_COUNTER, "otp_counter", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_TIME, "otp_time", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_USER_IDENTIFIER, "otp_user_identifier", AttrTypeString, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_SERVICE_IDENTIFIER, "otp_service_identifier", AttrTypeString, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_SERVICE_LOGO, "otp_service_logo", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_OTP_SERVICE_LOGO_TYPE, "otp_service_logo_type", AttrTypeString, false, false, false, false, nil},
+	{pkcs11.CKA_GOSTR3410_PARAMS, "gostr3410_params", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_GOSTR3411_PARAMS, "gostr3411_params", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_GOST28147_PARAMS, "gost28147_params", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_HW_FEATURE_TYPE, "hw_feature_type", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_RESET_ON_INIT, "reset_on_init", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_HAS_RESET, "has_reset", AttrTypeBool, false, false, true, false, nil},
+	{pkcs11.CKA_PIXEL_X, "pixel_x", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_PIXEL_Y, "pixel_y", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_RESOLUTION, "resolution", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_CHAR_ROWS, "char_rows", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_CHAR_COLUMNS, "char_columns", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_COLOR, "color", AttrTypeBool, false, false, false, false, nil},
+	{pkcs11.CKA_BITS_PER_PIXEL, "bits_per_pixel", AttrTypeUlong, false, false, false, false, nil},
+	{pkcs11.CKA_CHAR_SETS, "char_sets", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_ENCODING_METHODS, "encoding_methods", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_MIME_TYPES, "mime_types", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_MECHANISM_TYPE, "mechanism_type", AttrTypeUlong, false, false, false, false, MechanismEnum},
+	{pkcs11.CKA_REQUIRED_CMS_ATTRIBUTES, "required_cms_attributes", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_DEFAULT_CMS_ATTRIBUTES, "default_cms_attributes", AttrTypeBytes, false, false, false, false, nil},
+	{pkcs11.CKA_SUPPORTED_CMS_ATTRIBUTES, "supported_cms_attributes", AttrTypeBytes, false, false, false, false, nil},
 }
 
 var AttributeNameToDef map[string]AttrDef
@@ -210,6 +254,9 @@ func BytesToBigInt(b []byte) *big.Int {
 func NewAttribute(attrType uint, value interface{}) *pkcs11.Attribute {
 	return pkcs11.NewAttribute(attrType, value)
 }
+
+// MechanismEnum provides enum resolution for mechanism names.
+var MechanismEnum = &Pkcs11Enum{Prefix: "CKM_"}
 
 // MechanismNameToID maps mechanism name strings to CKM_* constants.
 var MechanismNameToID = map[string]uint{
@@ -589,6 +636,7 @@ func init() {
 	for name, id := range MechanismNameToID {
 		MechanismIDToName[id] = name
 	}
+	MechanismEnum.Mapping = MechanismNameToID
 }
 
 // KeyTypeNameToID maps key type names to CKK_* constants.

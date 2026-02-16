@@ -178,5 +178,6 @@ func (r *ObjectResource) ImportState(ctx context.Context, req resource.ImportSta
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("label"), label)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("key_id"), pkcs11client.EncodeBase64(keyID))...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("class"), int64(classID))...)
+	classEnum := pkcs11client.AttributeNameToDef["class"].Pkcs11Enum
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("class"), classEnum.Format(classID))...)
 }

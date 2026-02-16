@@ -43,9 +43,16 @@ func (d *ObjectDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 				Description: fmt.Sprintf("PKCS#11 attribute CKA_%s", strings.ToUpper(def.TFKey)),
 			}
 		case pkcs11client.AttrTypeUlong:
-			attrs[def.TFKey] = schema.Int64Attribute{
-				Optional:    true,
-				Description: fmt.Sprintf("PKCS#11 attribute CKA_%s", strings.ToUpper(def.TFKey)),
+			if def.Pkcs11Enum != nil {
+				attrs[def.TFKey] = schema.StringAttribute{
+					Optional:    true,
+					Description: fmt.Sprintf("PKCS#11 attribute CKA_%s. Accepts constant name or numeric value.", strings.ToUpper(def.TFKey)),
+				}
+			} else {
+				attrs[def.TFKey] = schema.Int64Attribute{
+					Optional:    true,
+					Description: fmt.Sprintf("PKCS#11 attribute CKA_%s", strings.ToUpper(def.TFKey)),
+				}
 			}
 		}
 
@@ -98,10 +105,23 @@ func (d *ObjectDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 				attrVal = strVal.ValueString()
 			}
 		case pkcs11client.AttrTypeUlong:
-			var intVal types.Int64
-			resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(def.TFKey), &intVal)...)
-			if !intVal.IsNull() {
-				attrVal = intVal.ValueInt64()
+			if def.Pkcs11Enum != nil {
+				var strVal types.String
+				resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(def.TFKey), &strVal)...)
+				if !strVal.IsNull() {
+					id, err := def.Pkcs11Enum.Resolve(strVal.ValueString())
+					if err != nil {
+						resp.Diagnostics.AddError("Invalid enum value", fmt.Sprintf("attribute %s: %s", def.TFKey, err))
+						return
+					}
+					attrVal = id
+				}
+			} else {
+				var intVal types.Int64
+				resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(def.TFKey), &intVal)...)
+				if !intVal.IsNull() {
+					attrVal = intVal.ValueInt64()
+				}
 			}
 		}
 
@@ -147,7 +167,11 @@ func (d *ObjectDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		case pkcs11client.AttrTypeHex:
 			setVal = pkcs11client.EncodeHex(val)
 		case pkcs11client.AttrTypeUlong:
-			setVal = pkcs11client.BytesToUlong(val)
+			if def.Pkcs11Enum != nil {
+				setVal = def.Pkcs11Enum.Format(pkcs11client.BytesToUlong(val))
+			} else {
+				setVal = pkcs11client.BytesToUlong(val)
+			}
 		}
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(attrName), setVal)...)
 	}

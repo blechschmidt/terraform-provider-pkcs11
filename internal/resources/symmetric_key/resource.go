@@ -43,8 +43,9 @@ func (r *SymmetricKeyResource) Schema(_ context.Context, _ resource.SchemaReques
 	}
 	attrs["mechanism"] = schema.StringAttribute{
 		Required:    true,
-		Description: "Key generation mechanism name (e.g., CKM_AES_KEY_GEN, CKM_DES3_KEY_GEN, CKM_GENERIC_SECRET_KEY_GEN).",
+		Description: "Key generation mechanism name (e.g., CKM_AES_KEY_GEN, CKM_DES3_KEY_GEN, CKM_GENERIC_SECRET_KEY_GEN). Accepts name with or without CKM_ prefix.",
 		PlanModifiers: []planmodifier.String{
+			shared.MechanismNormalizer{},
 			stringplanmodifier.RequiresReplace(),
 		},
 	}
@@ -76,9 +77,9 @@ func (r *SymmetricKeyResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	mechanismID, ok := pkcs11client.MechanismNameToID[mechanismName]
-	if !ok {
-		resp.Diagnostics.AddError("Invalid mechanism", fmt.Sprintf("Unknown mechanism: %s", mechanismName))
+	mechanismID, err := pkcs11client.MechanismEnum.Resolve(mechanismName)
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid mechanism", err.Error())
 		return
 	}
 
@@ -193,5 +194,6 @@ func (r *SymmetricKeyResource) ImportState(ctx context.Context, req resource.Imp
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("label"), label)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("key_id"), pkcs11client.EncodeBase64(keyID))...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("class"), int64(classID))...)
+	classEnum := pkcs11client.AttributeNameToDef["class"].Pkcs11Enum
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("class"), classEnum.Format(classID))...)
 }

@@ -85,18 +85,33 @@ func ObjectAttrSchema() map[string]schema.Attribute {
 			attrs[def.TFKey] = a
 
 		case pkcs11client.AttrTypeUlong:
-			a := schema.Int64Attribute{
-				Optional:    true,
-				Computed:    true,
-				Description: fmt.Sprintf("PKCS#11 attribute %s.", def.TFKey),
-				Sensitive:   def.Sensitive,
-			}
-			if def.ForceNew || def.Immutable {
-				a.PlanModifiers = []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
+			if def.Pkcs11Enum != nil {
+				a := schema.StringAttribute{
+					Optional:    true,
+					Computed:    true,
+					Description: fmt.Sprintf("PKCS#11 attribute %s. Accepts constant name (e.g. %sFOO) or numeric value.", def.TFKey, def.Pkcs11Enum.Prefix),
+					Sensitive:   def.Sensitive,
 				}
+				mods := []planmodifier.String{EnumNormalizer{Enum: def.Pkcs11Enum}}
+				if def.ForceNew || def.Immutable {
+					mods = append(mods, stringplanmodifier.RequiresReplace())
+				}
+				a.PlanModifiers = mods
+				attrs[def.TFKey] = a
+			} else {
+				a := schema.Int64Attribute{
+					Optional:    true,
+					Computed:    true,
+					Description: fmt.Sprintf("PKCS#11 attribute %s.", def.TFKey),
+					Sensitive:   def.Sensitive,
+				}
+				if def.ForceNew || def.Immutable {
+					a.PlanModifiers = []planmodifier.Int64{
+						int64planmodifier.RequiresReplace(),
+					}
+				}
+				attrs[def.TFKey] = a
 			}
-			attrs[def.TFKey] = a
 		}
 	}
 
@@ -211,6 +226,18 @@ func readAttribute(ctx context.Context, src AttrReader, def pkcs11client.AttrDef
 		return pkcs11.NewAttribute(def.Type, decoded), nil
 
 	case pkcs11client.AttrTypeUlong:
+		if def.Pkcs11Enum != nil {
+			var v types.String
+			src.GetAttribute(ctx, attrPath, &v)
+			if v.IsNull() || v.IsUnknown() {
+				return nil, nil
+			}
+			id, err := def.Pkcs11Enum.Resolve(v.ValueString())
+			if err != nil {
+				return nil, fmt.Errorf("attribute %s: %w", def.TFKey, err)
+			}
+			return pkcs11.NewAttribute(def.Type, id), nil
+		}
 		var v types.Int64
 		src.GetAttribute(ctx, attrPath, &v)
 		if v.IsNull() || v.IsUnknown() {
@@ -291,7 +318,11 @@ func readObjectIntoStateAt(ctx context.Context, client *pkcs11client.Client, han
 		case pkcs11client.AttrTypeHex:
 			diags.Append(state.SetAttribute(ctx, attrPath, pkcs11client.EncodeHex(val))...)
 		case pkcs11client.AttrTypeUlong:
-			diags.Append(state.SetAttribute(ctx, attrPath, int64(pkcs11client.BytesToUlong(val)))...)
+			if def.Pkcs11Enum != nil {
+				diags.Append(state.SetAttribute(ctx, attrPath, def.Pkcs11Enum.Format(pkcs11client.BytesToUlong(val)))...)
+			} else {
+				diags.Append(state.SetAttribute(ctx, attrPath, int64(pkcs11client.BytesToUlong(val)))...)
+			}
 		}
 	}
 
@@ -302,18 +333,24 @@ func readObjectIntoStateAt(ctx context.Context, client *pkcs11client.Client, han
 func FindObject(ctx context.Context, client *pkcs11client.Client, state tfsdk.State) (pkcs11.ObjectHandle, error) {
 	var label types.String
 	var keyID types.String
-	var class types.Int64
+	var class types.String
 
 	state.GetAttribute(ctx, path.Root("label"), &label)
 	state.GetAttribute(ctx, path.Root("key_id"), &keyID)
 	state.GetAttribute(ctx, path.Root("class"), &class)
+
+	classEnum := pkcs11client.AttributeNameToDef["class"].Pkcs11Enum
 
 	var template []*pkcs11.Attribute
 	if !label.IsNull() && !label.IsUnknown() {
 		template = append(template, pkcs11.NewAttribute(pkcs11.CKA_LABEL, label.ValueString()))
 	}
 	if !class.IsNull() && !class.IsUnknown() {
-		template = append(template, pkcs11.NewAttribute(pkcs11.CKA_CLASS, uint(class.ValueInt64())))
+		classID, err := classEnum.Resolve(class.ValueString())
+		if err != nil {
+			return 0, fmt.Errorf("invalid class: %w", err)
+		}
+		template = append(template, pkcs11.NewAttribute(pkcs11.CKA_CLASS, classID))
 	}
 	if !keyID.IsNull() && !keyID.IsUnknown() && keyID.ValueString() != "" {
 		id, err := pkcs11client.DecodeBase64(keyID.ValueString())
@@ -367,11 +404,13 @@ func findObjectWithClassAt(ctx context.Context, client *pkcs11client.Client, sta
 func BuildObjectID(ctx context.Context, state *tfsdk.State) string {
 	var label types.String
 	var keyID types.String
-	var class types.Int64
+	var class types.String
 
 	state.GetAttribute(ctx, path.Root("label"), &label)
 	state.GetAttribute(ctx, path.Root("key_id"), &keyID)
 	state.GetAttribute(ctx, path.Root("class"), &class)
+
+	classEnum := pkcs11client.AttributeNameToDef["class"].Pkcs11Enum
 
 	var ckaID []byte
 	if !keyID.IsNull() && !keyID.IsUnknown() && keyID.ValueString() != "" {
@@ -383,7 +422,7 @@ func BuildObjectID(ctx context.Context, state *tfsdk.State) string {
 	}
 	var classVal uint
 	if !class.IsNull() && !class.IsUnknown() {
-		classVal = uint(class.ValueInt64())
+		classVal, _ = classEnum.Resolve(class.ValueString())
 	}
 	return pkcs11client.FormatObjectID(labelStr, ckaID, classVal)
 }
@@ -454,4 +493,52 @@ func (m BoolRequiresReplace) PlanModifyBool(_ context.Context, req planmodifier.
 	if !req.PlanValue.Equal(req.StateValue) {
 		resp.RequiresReplace = true
 	}
+}
+
+// EnumNormalizer normalizes enum string values to their canonical PKCS#11 constant names during planning.
+type EnumNormalizer struct {
+	Enum *pkcs11client.Pkcs11Enum
+}
+
+func (m EnumNormalizer) Description(_ context.Context) string {
+	return "Normalizes the value to the canonical PKCS#11 constant name."
+}
+
+func (m EnumNormalizer) MarkdownDescription(_ context.Context) string {
+	return "Normalizes the value to the canonical PKCS#11 constant name."
+}
+
+func (m EnumNormalizer) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
+		return
+	}
+	id, err := m.Enum.Resolve(req.PlanValue.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid enum value", err.Error())
+		return
+	}
+	resp.PlanValue = types.StringValue(m.Enum.Format(id))
+}
+
+// MechanismNormalizer normalizes mechanism name values to their canonical CKM_ names during planning.
+type MechanismNormalizer struct{}
+
+func (m MechanismNormalizer) Description(_ context.Context) string {
+	return "Normalizes the value to the canonical PKCS#11 mechanism name."
+}
+
+func (m MechanismNormalizer) MarkdownDescription(_ context.Context) string {
+	return "Normalizes the value to the canonical PKCS#11 mechanism name."
+}
+
+func (m MechanismNormalizer) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
+		return
+	}
+	id, err := pkcs11client.MechanismEnum.Resolve(req.PlanValue.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid mechanism", err.Error())
+		return
+	}
+	resp.PlanValue = types.StringValue(pkcs11client.MechanismEnum.Format(id))
 }

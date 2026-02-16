@@ -49,8 +49,9 @@ func (r *KeyPairResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"mechanism": schema.StringAttribute{
 				Required:    true,
-				Description: "Key pair generation mechanism name (e.g., CKM_RSA_PKCS_KEY_PAIR_GEN, CKM_EC_KEY_PAIR_GEN).",
+				Description: "Key pair generation mechanism name (e.g., CKM_RSA_PKCS_KEY_PAIR_GEN, CKM_EC_KEY_PAIR_GEN). Accepts name with or without CKM_ prefix.",
 				PlanModifiers: []planmodifier.String{
+					shared.MechanismNormalizer{},
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
@@ -88,9 +89,9 @@ func (r *KeyPairResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	mechanismID, ok := pkcs11client.MechanismNameToID[mechanismName]
-	if !ok {
-		resp.Diagnostics.AddError("Invalid mechanism", fmt.Sprintf("Unknown mechanism: %s", mechanismName))
+	mechanismID, err := pkcs11client.MechanismEnum.Resolve(mechanismName)
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid mechanism", err.Error())
 		return
 	}
 

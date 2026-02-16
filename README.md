@@ -54,11 +54,11 @@ Creates a generic PKCS#11 object on the token using `C_CreateObject`. All PKCS#1
 
 ### `pkcs11_key_pair`
 
-Generates an asymmetric key pair using `C_GenerateKeyPair`. Requires a `mechanism` (e.g., `CKM_RSA_PKCS_KEY_PAIR_GEN`, `CKM_EC_KEY_PAIR_GEN`) and separate `public_key` and `private_key` blocks for the respective attribute templates.
+Generates an asymmetric key pair using `C_GenerateKeyPair`. Requires a `mechanism` and separate `public_key` and `private_key` blocks for the respective attribute templates.
 
 ### `pkcs11_symmetric_key`
 
-Generates a symmetric key using `C_GenerateKey`. Requires a `mechanism` (e.g., `CKM_AES_KEY_GEN`, `CKM_DES3_KEY_GEN`, `CKM_GENERIC_SECRET_KEY_GEN`). All PKCS#11 attributes can be specified directly.
+Generates a symmetric key using `C_GenerateKey`. Requires a `mechanism`. All PKCS#11 attributes can be specified directly.
 
 ## Data Sources
 
@@ -70,7 +70,7 @@ Generates a symmetric key using `C_GenerateKey`. Requires a `mechanism` (e.g., `
 | `pkcs11_object`        | Look up an object by attributes, returning all readable attributes |
 | `pkcs11_constants`     | PKCS#11 constant name-to-value mappings           |
 
-## Example Usage (YubiHSM)
+## Example Usage
 
 ```hcl
 terraform {
@@ -92,11 +92,9 @@ provider "pkcs11" {
   pin         = var.pkcs11_pin
 }
 
-data "pkcs11_constants" "constants" {}
-
 # Create a generic data object
 resource "pkcs11_object" "my_data" {
-  class = data.pkcs11_constants.constants.all["CKO_DATA"]
+  class = "CKO_DATA"
   label = "my-object"
   value = base64encode("hello world")
 }
@@ -106,8 +104,8 @@ resource "pkcs11_key_pair" "signing" {
   mechanism = "CKM_RSA_PKCS_KEY_PAIR_GEN"
 
   public_key = {
-    key_type        = data.pkcs11_constants.constants.all["CKK_RSA"]
-    class           = data.pkcs11_constants.constants.all["CKO_PUBLIC_KEY"]
+    key_type        = "CKK_RSA"
+    class           = "CKO_PUBLIC_KEY"
     token           = true
     verify          = true
     encrypt         = true
@@ -116,8 +114,8 @@ resource "pkcs11_key_pair" "signing" {
     public_exponent = "010001" # 65537 in hex
   }
   private_key = {
-    key_type = data.pkcs11_constants.constants.all["CKK_RSA"]
-    class    = data.pkcs11_constants.constants.all["CKO_PRIVATE_KEY"]
+    key_type = "CKK_RSA"
+    class    = "CKO_PRIVATE_KEY"
     sign     = true
     decrypt  = true
     token    = true
@@ -129,8 +127,8 @@ resource "pkcs11_key_pair" "signing" {
 resource "pkcs11_symmetric_key" "test_key" {
   mechanism   = "CKM_AES_KEY_GEN"
   label       = "test-symmetric-key"
-  class       = data.pkcs11_constants.constants.all["CKO_SECRET_KEY"]
-  key_type    = data.pkcs11_constants.constants.all["CKK_AES"]
+  class       = "CKO_SECRET_KEY"
+  key_type    = "CKK_AES"
   value_len   = 32
   encrypt     = true
   decrypt     = true
@@ -160,7 +158,19 @@ All resources and the `pkcs11_object` data source use PKCS#11 attribute names wi
 | Byte arrays      | `string`       | Base64-encoded                    |
 | Big integers     | `string`       | Hex-encoded                       |
 
-Numeric constants (key types, object classes, mechanisms) can be looked up via the `pkcs11_constants` data source rather than hard-coding values.
+### Enum Attributes
+
+Attributes that represent PKCS#11 constants (`class`, `key_type`, `certificate_type`, `key_gen_mechanism`, `mechanism_type`) accept their values as strings. You can specify them in three ways:
+
+- **Full constant name**: `"CKO_SECRET_KEY"`, `"CKK_AES"`, `"CKM_AES_KEY_GEN"`
+- **Without prefix**: `"SECRET_KEY"`, `"AES"`, `"AES_KEY_GEN"`
+- **Numeric value**: `"3"`, `"31"`
+
+The `mechanism` attribute on `pkcs11_symmetric_key` and `pkcs11_key_pair` also supports these formats with the `CKM_` prefix.
+
+Values are always normalized to the canonical full name in state (e.g., `"SECRET_KEY"` becomes `"CKO_SECRET_KEY"`).
+
+The `pkcs11_constants` data source is still available for looking up numeric values of all PKCS#11 constants.
 
 ## Import
 

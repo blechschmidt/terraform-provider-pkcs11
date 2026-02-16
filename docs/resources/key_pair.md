@@ -13,15 +13,13 @@ Generates an asymmetric key pair on a PKCS#11 token using C_GenerateKeyPair. Pub
 ## Example Usage
 
 ```terraform
-data "pkcs11_constants" "constants" {}
-
 # Generate an RSA 2048-bit key pair
 resource "pkcs11_key_pair" "rsa_signing" {
   mechanism = "CKM_RSA_PKCS_KEY_PAIR_GEN"
 
   public_key = {
-    key_type        = data.pkcs11_constants.constants.all["CKK_RSA"]
-    class           = data.pkcs11_constants.constants.all["CKO_PUBLIC_KEY"]
+    key_type        = "CKK_RSA"
+    class           = "CKO_PUBLIC_KEY"
     token           = true
     verify          = true
     encrypt         = true
@@ -31,8 +29,8 @@ resource "pkcs11_key_pair" "rsa_signing" {
   }
 
   private_key = {
-    key_type = data.pkcs11_constants.constants.all["CKK_RSA"]
-    class    = data.pkcs11_constants.constants.all["CKO_PRIVATE_KEY"]
+    key_type = "CKK_RSA"
+    class    = "CKO_PRIVATE_KEY"
     token    = true
     sign     = true
     decrypt  = true
@@ -46,7 +44,7 @@ resource "pkcs11_key_pair" "rsa_signing" {
 
 ### Required
 
-- `mechanism` (String) Key pair generation mechanism name (e.g., CKM_RSA_PKCS_KEY_PAIR_GEN, CKM_EC_KEY_PAIR_GEN).
+- `mechanism` (String) Key pair generation mechanism name (e.g., CKM_RSA_PKCS_KEY_PAIR_GEN, CKM_EC_KEY_PAIR_GEN). Accepts name with or without CKM_ prefix.
 - `private_key` (Attributes) Attributes for the private key template. (see [below for nested schema](#nestedatt--private_key))
 - `public_key` (Attributes) Attributes for the public key template. (see [below for nested schema](#nestedatt--public_key))
 
@@ -67,12 +65,12 @@ Optional:
 - `base` (String) PKCS#11 attribute base (hex-encoded).
 - `bits_per_pixel` (Number) PKCS#11 attribute bits_per_pixel.
 - `certificate_category` (Number) PKCS#11 attribute certificate_category.
-- `certificate_type` (Number) PKCS#11 attribute certificate_type.
+- `certificate_type` (String) PKCS#11 attribute certificate_type. Accepts constant name (e.g. CKC_FOO) or numeric value.
 - `char_columns` (Number) PKCS#11 attribute char_columns.
 - `char_rows` (Number) PKCS#11 attribute char_rows.
 - `char_sets` (String) PKCS#11 attribute char_sets (base64-encoded).
 - `check_value` (String) PKCS#11 attribute check_value (base64-encoded).
-- `class` (Number) PKCS#11 attribute class.
+- `class` (String) PKCS#11 attribute class. Accepts constant name (e.g. CKO_FOO) or numeric value.
 - `coefficient` (String, Sensitive) PKCS#11 attribute coefficient (hex-encoded).
 - `color` (Boolean) PKCS#11 attribute color.
 - `copyable` (Boolean) PKCS#11 attribute copyable.
@@ -97,12 +95,12 @@ Optional:
 - `hw_feature_type` (Number) PKCS#11 attribute hw_feature_type.
 - `issuer` (String) PKCS#11 attribute issuer (base64-encoded).
 - `java_midp_security_domain` (Number) PKCS#11 attribute java_midp_security_domain.
-- `key_gen_mechanism` (Number) PKCS#11 attribute key_gen_mechanism.
+- `key_gen_mechanism` (String) PKCS#11 attribute key_gen_mechanism. Accepts constant name (e.g. CKM_FOO) or numeric value.
 - `key_id` (String) PKCS#11 attribute key_id (base64-encoded).
-- `key_type` (Number) PKCS#11 attribute key_type.
+- `key_type` (String) PKCS#11 attribute key_type. Accepts constant name (e.g. CKK_FOO) or numeric value.
 - `label` (String) PKCS#11 attribute label.
 - `local` (Boolean) PKCS#11 attribute local.
-- `mechanism_type` (Number) PKCS#11 attribute mechanism_type.
+- `mechanism_type` (String) PKCS#11 attribute mechanism_type. Accepts constant name (e.g. CKM_FOO) or numeric value.
 - `mime_types` (String) PKCS#11 attribute mime_types (base64-encoded).
 - `modifiable` (Boolean) PKCS#11 attribute modifiable.
 - `modulus` (String) PKCS#11 attribute modulus (hex-encoded).
@@ -173,12 +171,12 @@ Optional:
 - `base` (String) PKCS#11 attribute base (hex-encoded).
 - `bits_per_pixel` (Number) PKCS#11 attribute bits_per_pixel.
 - `certificate_category` (Number) PKCS#11 attribute certificate_category.
-- `certificate_type` (Number) PKCS#11 attribute certificate_type.
+- `certificate_type` (String) PKCS#11 attribute certificate_type. Accepts constant name (e.g. CKC_FOO) or numeric value.
 - `char_columns` (Number) PKCS#11 attribute char_columns.
 - `char_rows` (Number) PKCS#11 attribute char_rows.
 - `char_sets` (String) PKCS#11 attribute char_sets (base64-encoded).
 - `check_value` (String) PKCS#11 attribute check_value (base64-encoded).
-- `class` (Number) PKCS#11 attribute class.
+- `class` (String) PKCS#11 attribute class. Accepts constant name (e.g. CKO_FOO) or numeric value.
 - `coefficient` (String, Sensitive) PKCS#11 attribute coefficient (hex-encoded).
 - `color` (Boolean) PKCS#11 attribute color.
 - `copyable` (Boolean) PKCS#11 attribute copyable.
@@ -203,12 +201,12 @@ Optional:
 - `hw_feature_type` (Number) PKCS#11 attribute hw_feature_type.
 - `issuer` (String) PKCS#11 attribute issuer (base64-encoded).
 - `java_midp_security_domain` (Number) PKCS#11 attribute java_midp_security_domain.
-- `key_gen_mechanism` (Number) PKCS#11 attribute key_gen_mechanism.
+- `key_gen_mechanism` (String) PKCS#11 attribute key_gen_mechanism. Accepts constant name (e.g. CKM_FOO) or numeric value.
 - `key_id` (String) PKCS#11 attribute key_id (base64-encoded).
-- `key_type` (Number) PKCS#11 attribute key_type.
+- `key_type` (String) PKCS#11 attribute key_type. Accepts constant name (e.g. CKK_FOO) or numeric value.
 - `label` (String) PKCS#11 attribute label.
 - `local` (Boolean) PKCS#11 attribute local.
-- `mechanism_type` (Number) PKCS#11 attribute mechanism_type.
+- `mechanism_type` (String) PKCS#11 attribute mechanism_type. Accepts constant name (e.g. CKM_FOO) or numeric value.
 - `mime_types` (String) PKCS#11 attribute mime_types (base64-encoded).
 - `modifiable` (Boolean) PKCS#11 attribute modifiable.
 - `modulus` (String) PKCS#11 attribute modulus (hex-encoded).
