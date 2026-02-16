@@ -12,9 +12,10 @@ variable "pkcs11_pin" {
 }
 
 provider "pkcs11" {
-  module_path = "/usr/lib/pkcs11/yubihsm_pkcs11.so"
-  slot_id     = 0
-  pin         = var.pkcs11_pin
+  module_path   = "/usr/lib/pkcs11/yubihsm_pkcs11.so"
+  token_model   = "YubiHSM"
+  serial_number = "31650425"
+  pin           = var.pkcs11_pin
   env = {
     "YUBIHSM_PKCS11_CONF" : "/etc/yubihsm_pkcs11.conf"
   }

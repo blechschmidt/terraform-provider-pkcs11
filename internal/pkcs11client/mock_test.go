@@ -54,8 +54,13 @@ type mockSession struct {
 	findDone bool
 }
 
-// NewMockContext creates a MockContext with one slot containing a token.
+// NewMockContext creates a MockContext with one slot containing a token with the given label.
 func NewMockContext(tokenLabel string) *MockContext {
+	return NewMockContextWithToken(tokenLabel, "Test Manufacturer", "Mock HSM", "0001")
+}
+
+// NewMockContextWithToken creates a MockContext with one slot containing a token with custom fields.
+func NewMockContextWithToken(label, manufacturer, model, serial string) *MockContext {
 	m := &MockContext{
 		slots:    make(map[uint]*mockSlot),
 		sessions: make(map[pkcs11.SessionHandle]*mockSession),
@@ -68,10 +73,10 @@ func NewMockContext(tokenLabel string) *MockContext {
 			Flags:           pkcs11.CKF_TOKEN_PRESENT,
 		},
 		token: &pkcs11.TokenInfo{
-			Label:          tokenLabel,
-			ManufacturerID: "Test Manufacturer",
-			Model:          "Mock HSM",
-			SerialNumber:   "0001",
+			Label:          label,
+			ManufacturerID: manufacturer,
+			Model:          model,
+			SerialNumber:   serial,
 			MaxPinLen:      32,
 			MinPinLen:      4,
 		},

@@ -2,6 +2,7 @@ package pkcs11client
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/miekg/pkcs11"
@@ -37,12 +38,21 @@ type Pkcs11Context interface {
 
 // Config holds configuration for creating a Client.
 type Config struct {
-	ModulePath string
-	TokenLabel string
-	SlotID     *uint
-	Pin        string
-	SoPin      string
-	PoolSize   int
+	ModulePath        string
+	TokenLabel        string
+	SerialNumber      string
+	TokenManufacturer string
+	TokenModel        string
+	SlotID            *uint
+	Pin               string
+	SoPin             string
+	PoolSize          int
+}
+
+// HasTokenFilters returns true if any token-based filter is set in the config.
+func HasTokenFilters(cfg Config) bool {
+	return cfg.TokenLabel != "" || cfg.SerialNumber != "" ||
+		cfg.TokenManufacturer != "" || cfg.TokenModel != ""
 }
 
 // Client manages a connection to a PKCS#11 module.
@@ -138,7 +148,24 @@ func (c *Client) withSession(fn func(sh pkcs11.SessionHandle) error) error {
 	return nil
 }
 
-// resolveSlot finds the slot ID from config (either explicit or by token label).
+// tokenMatches checks whether a token's info matches all non-empty filter fields in the config.
+func tokenMatches(info pkcs11.TokenInfo, cfg Config) bool {
+	if cfg.TokenLabel != "" && info.Label != cfg.TokenLabel {
+		return false
+	}
+	if cfg.SerialNumber != "" && info.SerialNumber != cfg.SerialNumber {
+		return false
+	}
+	if cfg.TokenManufacturer != "" && info.ManufacturerID != cfg.TokenManufacturer {
+		return false
+	}
+	if cfg.TokenModel != "" && info.Model != cfg.TokenModel {
+		return false
+	}
+	return true
+}
+
+// resolveSlot finds the slot ID from config (either explicit or by token filters).
 func resolveSlot(ctx Pkcs11Context, cfg Config) (uint, error) {
 	if cfg.SlotID != nil {
 		return *cfg.SlotID, nil
@@ -154,10 +181,24 @@ func resolveSlot(ctx Pkcs11Context, cfg Config) (uint, error) {
 		if err != nil {
 			continue
 		}
-		if info.Label == cfg.TokenLabel {
+		if tokenMatches(info, cfg) {
 			return slot, nil
 		}
 	}
 
-	return 0, fmt.Errorf("%w: no slot with token label %q", ErrSlotNotFound, cfg.TokenLabel)
+	// Build descriptive error with specified filters
+	var filters []string
+	if cfg.TokenLabel != "" {
+		filters = append(filters, fmt.Sprintf("label=%q", cfg.TokenLabel))
+	}
+	if cfg.SerialNumber != "" {
+		filters = append(filters, fmt.Sprintf("serial_number=%q", cfg.SerialNumber))
+	}
+	if cfg.TokenManufacturer != "" {
+		filters = append(filters, fmt.Sprintf("manufacturer=%q", cfg.TokenManufacturer))
+	}
+	if cfg.TokenModel != "" {
+		filters = append(filters, fmt.Sprintf("model=%q", cfg.TokenModel))
+	}
+	return 0, fmt.Errorf("%w: no token matching %s", ErrSlotNotFound, strings.Join(filters, ", "))
 }

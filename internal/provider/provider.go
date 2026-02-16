@@ -30,12 +30,15 @@ type Pkcs11Provider struct {
 
 // Pkcs11ProviderModel describes the provider configuration data model.
 type Pkcs11ProviderModel struct {
-	ModulePath types.String `tfsdk:"module_path"`
-	TokenLabel types.String `tfsdk:"token_label"`
-	SlotID     types.Int64  `tfsdk:"slot_id"`
-	Pin        types.String `tfsdk:"pin"`
-	SoPin      types.String `tfsdk:"so_pin"`
-	Env        types.Map    `tfsdk:"env"`
+	ModulePath        types.String `tfsdk:"module_path"`
+	TokenLabel        types.String `tfsdk:"token_label"`
+	SerialNumber      types.String `tfsdk:"serial_number"`
+	TokenManufacturer types.String `tfsdk:"token_manufacturer"`
+	TokenModel        types.String `tfsdk:"token_model"`
+	SlotID            types.Int64  `tfsdk:"slot_id"`
+	Pin               types.String `tfsdk:"pin"`
+	SoPin             types.String `tfsdk:"so_pin"`
+	Env               types.Map    `tfsdk:"env"`
 }
 
 // New creates a factory function for the provider.
@@ -59,11 +62,23 @@ func (p *Pkcs11Provider) Schema(_ context.Context, _ provider.SchemaRequest, res
 				Optional:    true,
 			},
 			"token_label": schema.StringAttribute{
-				Description: "Label of the token to use. Mutually exclusive with slot_id. Can also be set via PKCS11_TOKEN_LABEL env var.",
+				Description: "Label of the token to use. Can be combined with serial_number, token_manufacturer, and token_model. Mutually exclusive with slot_id. Can also be set via PKCS11_TOKEN_LABEL env var.",
+				Optional:    true,
+			},
+			"serial_number": schema.StringAttribute{
+				Description: "Serial number of the token to use. Can be combined with token_label, token_manufacturer, and token_model. Mutually exclusive with slot_id. Can also be set via PKCS11_SERIAL_NUMBER env var.",
+				Optional:    true,
+			},
+			"token_manufacturer": schema.StringAttribute{
+				Description: "Manufacturer of the token to use. Can be combined with token_label, serial_number, and token_model. Mutually exclusive with slot_id. Can also be set via PKCS11_TOKEN_MANUFACTURER env var.",
+				Optional:    true,
+			},
+			"token_model": schema.StringAttribute{
+				Description: "Model of the token to use. Can be combined with token_label, serial_number, and token_manufacturer. Mutually exclusive with slot_id. Can also be set via PKCS11_TOKEN_MODEL env var.",
 				Optional:    true,
 			},
 			"slot_id": schema.Int64Attribute{
-				Description: "Slot ID to use. Mutually exclusive with token_label. Can also be set via PKCS11_SLOT_ID env var.",
+				Description: "Slot ID to use. Mutually exclusive with token_label, serial_number, token_manufacturer, and token_model. Can also be set via PKCS11_SLOT_ID env var.",
 				Optional:    true,
 			},
 			"pin": schema.StringAttribute{
@@ -95,6 +110,9 @@ func (p *Pkcs11Provider) Configure(ctx context.Context, req provider.ConfigureRe
 	// Resolve values from config or environment
 	modulePath := stringValueOrEnv(config.ModulePath, "PKCS11_MODULE_PATH")
 	tokenLabel := stringValueOrEnv(config.TokenLabel, "PKCS11_TOKEN_LABEL")
+	serialNumber := stringValueOrEnv(config.SerialNumber, "PKCS11_SERIAL_NUMBER")
+	tokenManufacturer := stringValueOrEnv(config.TokenManufacturer, "PKCS11_TOKEN_MANUFACTURER")
+	tokenModel := stringValueOrEnv(config.TokenModel, "PKCS11_TOKEN_MODEL")
 	pin := stringValueOrEnv(config.Pin, "PKCS11_PIN")
 	soPin := stringValueOrEnv(config.SoPin, "PKCS11_SO_PIN")
 
@@ -120,23 +138,28 @@ func (p *Pkcs11Provider) Configure(ctx context.Context, req provider.ConfigureRe
 		}
 	}
 
-	if tokenLabel == "" && slotID == nil {
-		resp.Diagnostics.AddError("Missing token identifier", "Either token_label or slot_id must be set")
-		return
-	}
-
-	if tokenLabel != "" && slotID != nil {
-		resp.Diagnostics.AddError("Conflicting token identifiers", "Only one of token_label or slot_id may be set")
-		return
-	}
-
 	cfg := pkcs11client.Config{
-		ModulePath: modulePath,
-		TokenLabel: tokenLabel,
-		SlotID:     slotID,
-		Pin:        pin,
-		SoPin:      soPin,
-		PoolSize:   5,
+		ModulePath:        modulePath,
+		TokenLabel:        tokenLabel,
+		SerialNumber:      serialNumber,
+		TokenManufacturer: tokenManufacturer,
+		TokenModel:        tokenModel,
+		SlotID:            slotID,
+		Pin:               pin,
+		SoPin:             soPin,
+		PoolSize:          5,
+	}
+
+	hasTokenFilter := pkcs11client.HasTokenFilters(cfg)
+
+	if !hasTokenFilter && slotID == nil {
+		resp.Diagnostics.AddError("Missing token identifier", "At least one of token_label, serial_number, token_manufacturer, token_model, or slot_id must be set")
+		return
+	}
+
+	if hasTokenFilter && slotID != nil {
+		resp.Diagnostics.AddError("Conflicting token identifiers", "slot_id is mutually exclusive with token_label, serial_number, token_manufacturer, and token_model")
+		return
 	}
 
 	client, err := pkcs11client.NewClient(cfg)

@@ -38,13 +38,18 @@ provider "pkcs11" {
 }
 ```
 
-| Attribute     | Env Var              | Description                                      |
-|---------------|----------------------|--------------------------------------------------|
-| `module_path` | `PKCS11_MODULE_PATH` | Path to the PKCS#11 shared library (required)    |
-| `token_label` | `PKCS11_TOKEN_LABEL` | Token label (mutually exclusive with `slot_id`)  |
-| `slot_id`     | `PKCS11_SLOT_ID`     | Slot ID (mutually exclusive with `token_label`)  |
-| `pin`         | `PKCS11_PIN`         | User PIN for login                               |
-| `so_pin`      | `PKCS11_SO_PIN`      | Security Officer PIN                             |
+| Attribute            | Env Var                      | Description                                                        |
+|----------------------|------------------------------|--------------------------------------------------------------------|
+| `module_path`        | `PKCS11_MODULE_PATH`         | Path to the PKCS#11 shared library (required)                      |
+| `token_label`        | `PKCS11_TOKEN_LABEL`         | Token label filter (combinable with other token filters)           |
+| `serial_number`      | `PKCS11_SERIAL_NUMBER`       | Token serial number filter                                         |
+| `token_manufacturer` | `PKCS11_TOKEN_MANUFACTURER`  | Token manufacturer filter                                          |
+| `token_model`        | `PKCS11_TOKEN_MODEL`         | Token model filter                                                 |
+| `slot_id`            | `PKCS11_SLOT_ID`             | Slot ID (mutually exclusive with token filters)                    |
+| `pin`                | `PKCS11_PIN`                 | User PIN for login                                                 |
+| `so_pin`             | `PKCS11_SO_PIN`              | Security Officer PIN                                               |
+
+Token selection uses either `slot_id` (explicit) or one or more token filters (`token_label`, `serial_number`, `token_manufacturer`, `token_model`). When multiple filters are specified, all must match (AND logic). At least one of `slot_id` or a token filter is required.
 
 ## Resources
 

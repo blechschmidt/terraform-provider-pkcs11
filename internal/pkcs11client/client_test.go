@@ -47,6 +47,89 @@ func TestNewClientWithContext_TokenNotFound(t *testing.T) {
 	}
 }
 
+func TestNewClientWithContext_ResolvesSerialNumber(t *testing.T) {
+	mock := NewMockContextWithToken("my-token", "Acme", "Model X", "SN123")
+	cfg := Config{
+		SerialNumber: "SN123",
+		Pin:          "1234",
+		PoolSize:     2,
+	}
+	client, err := NewClientWithContext(mock, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer client.Close()
+	if client.SlotID() != 0 {
+		t.Errorf("expected slot 0, got %d", client.SlotID())
+	}
+}
+
+func TestNewClientWithContext_ResolvesManufacturer(t *testing.T) {
+	mock := NewMockContextWithToken("my-token", "Acme Corp", "Model X", "SN123")
+	cfg := Config{
+		TokenManufacturer: "Acme Corp",
+		Pin:               "1234",
+		PoolSize:          2,
+	}
+	client, err := NewClientWithContext(mock, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer client.Close()
+	if client.SlotID() != 0 {
+		t.Errorf("expected slot 0, got %d", client.SlotID())
+	}
+}
+
+func TestNewClientWithContext_ResolvesModel(t *testing.T) {
+	mock := NewMockContextWithToken("my-token", "Acme", "Model X", "SN123")
+	cfg := Config{
+		TokenModel: "Model X",
+		Pin:        "1234",
+		PoolSize:   2,
+	}
+	client, err := NewClientWithContext(mock, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer client.Close()
+	if client.SlotID() != 0 {
+		t.Errorf("expected slot 0, got %d", client.SlotID())
+	}
+}
+
+func TestNewClientWithContext_ResolvesMultipleFilters(t *testing.T) {
+	mock := NewMockContextWithToken("my-token", "Acme", "Model X", "SN123")
+	cfg := Config{
+		TokenLabel:   "my-token",
+		SerialNumber: "SN123",
+		Pin:          "1234",
+		PoolSize:     2,
+	}
+	client, err := NewClientWithContext(mock, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer client.Close()
+	if client.SlotID() != 0 {
+		t.Errorf("expected slot 0, got %d", client.SlotID())
+	}
+}
+
+func TestNewClientWithContext_MultipleFiltersPartialMismatch(t *testing.T) {
+	mock := NewMockContextWithToken("my-token", "Acme", "Model X", "SN123")
+	cfg := Config{
+		TokenLabel:   "my-token",
+		SerialNumber: "WRONG",
+		Pin:          "1234",
+		PoolSize:     2,
+	}
+	_, err := NewClientWithContext(mock, cfg)
+	if err == nil {
+		t.Fatal("expected error when serial number does not match")
+	}
+}
+
 func TestCreateAndFindObject(t *testing.T) {
 	client, _ := newTestClient("test-token")
 	defer client.Close()
