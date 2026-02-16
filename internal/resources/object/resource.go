@@ -81,7 +81,7 @@ func (r *ObjectResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State)
+	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State, shared.PlanReader{Plan: req.Plan})
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -148,7 +148,7 @@ func (r *ObjectResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 	}
 
-	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State)
+	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State, shared.PlanReader{Plan: req.Plan})
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

@@ -34,6 +34,9 @@ func (e *Pkcs11Enum) Resolve(input string) (uint, error) {
 	if id, ok := e.Mapping[input]; ok {
 		return id, nil
 	}
+	if id, ok := e.Mapping[e.Prefix+input]; ok {
+		return id, nil
+	}
 	n, err := strconv.ParseUint(input, 10, 64)
 	if err == nil {
 		return uint(n), nil

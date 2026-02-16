@@ -168,6 +168,9 @@ EOF
     # Clean up working directory
     rm -rf "${work_dir}"
     echo ""
+
+    # Pause between tests to allow YubiHSM sessions to be released
+    sleep 5
 done
 
 # Summary

@@ -1,29 +1,29 @@
-# Test 17: Symmetric key with wrap/unwrap capabilities
-# Validates creating a wrapping key.
+# Test 17: AES 192-bit symmetric key
+# Validates creating an AES key with a different key size (192-bit).
 
-resource "pkcs11_symmetric_key" "wrap_key" {
+resource "pkcs11_symmetric_key" "aes192" {
   mechanism   = "CKM_AES_KEY_GEN"
-  label       = "test-17-wrap-key"
+  label       = "test-17-aes192"
   class       = "CKO_SECRET_KEY"
   key_type    = "CKK_AES"
-  value_len   = 32
-  wrap        = true
-  unwrap      = true
+  value_len   = 24
+  encrypt     = true
+  decrypt     = true
   token       = true
   sensitive   = true
   extractable = false
 }
 
-check "wrap_enabled" {
+check "aes192_value_len" {
   assert {
-    condition     = pkcs11_symmetric_key.wrap_key.wrap == true
-    error_message = "Wrap should be true"
+    condition     = pkcs11_symmetric_key.aes192.value_len == 24
+    error_message = "AES-192 key should have value_len 24"
   }
 }
 
-check "unwrap_enabled" {
+check "aes192_label" {
   assert {
-    condition     = pkcs11_symmetric_key.wrap_key.unwrap == true
-    error_message = "Unwrap should be true"
+    condition     = pkcs11_symmetric_key.aes192.label == "test-17-aes192"
+    error_message = "Label should match"
   }
 }

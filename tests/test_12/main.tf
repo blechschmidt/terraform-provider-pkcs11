@@ -14,16 +14,16 @@ resource "pkcs11_symmetric_key" "enum_no_prefix" {
   extractable = false
 }
 
-check "class_normalized" {
+check "class_accepted" {
   assert {
-    condition     = pkcs11_symmetric_key.enum_no_prefix.class == "CKO_SECRET_KEY"
-    error_message = "Class should normalize to CKO_SECRET_KEY"
+    condition     = pkcs11_symmetric_key.enum_no_prefix.class == "SECRET_KEY"
+    error_message = "Class should accept prefix-less value SECRET_KEY"
   }
 }
 
-check "key_type_normalized" {
+check "key_type_accepted" {
   assert {
-    condition     = pkcs11_symmetric_key.enum_no_prefix.key_type == "CKK_AES"
-    error_message = "Key type should normalize to CKK_AES"
+    condition     = pkcs11_symmetric_key.enum_no_prefix.key_type == "AES"
+    error_message = "Key type should accept prefix-less value AES"
   }
 }

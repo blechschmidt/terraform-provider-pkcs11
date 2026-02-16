@@ -8,9 +8,9 @@ resource "pkcs11_object" "no_prefix" {
   token = true
 }
 
-check "class_normalized" {
+check "class_accepted" {
   assert {
-    condition     = pkcs11_object.no_prefix.class == "CKO_DATA"
-    error_message = "Class should be normalized to CKO_DATA"
+    condition     = pkcs11_object.no_prefix.class == "DATA"
+    error_message = "Class should accept prefix-less value DATA"
   }
 }

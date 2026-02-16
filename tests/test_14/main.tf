@@ -23,9 +23,9 @@ resource "pkcs11_key_pair" "rsa_no_prefix" {
   }
 }
 
-check "mechanism_normalized" {
+check "mechanism_accepted" {
   assert {
-    condition     = pkcs11_key_pair.rsa_no_prefix.mechanism == "CKM_RSA_PKCS_KEY_PAIR_GEN"
-    error_message = "Mechanism should normalize to CKM_RSA_PKCS_KEY_PAIR_GEN"
+    condition     = pkcs11_key_pair.rsa_no_prefix.mechanism == "RSA_PKCS_KEY_PAIR_GEN"
+    error_message = "Mechanism should accept prefix-less value RSA_PKCS_KEY_PAIR_GEN"
   }
 }

@@ -29,7 +29,7 @@ check "has_slots" {
 
 check "has_constants" {
   assert {
-    condition     = length(data.pkcs11_constants.consts.constants) > 0
+    condition     = length(data.pkcs11_constants.consts.all) > 0
     error_message = "Should have constants defined"
   }
 }

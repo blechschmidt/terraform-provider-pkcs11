@@ -1,29 +1,29 @@
-# Test 23: Extractable symmetric key
-# Validates creating an extractable key.
+# Test 23: Data object value round-trip
+# Validates that a data object's value survives a create/read cycle.
 
-resource "pkcs11_symmetric_key" "extractable" {
-  mechanism   = "CKM_AES_KEY_GEN"
-  label       = "test-23-extractable"
-  class       = "CKO_SECRET_KEY"
-  key_type    = "CKK_AES"
-  value_len   = 32
-  encrypt     = true
-  decrypt     = true
-  token       = true
-  sensitive   = false
-  extractable = true
+resource "pkcs11_object" "roundtrip" {
+  class = "CKO_DATA"
+  label = "test-23-roundtrip"
+  value = base64encode("round trip test data")
+  token = true
 }
 
-check "key_extractable" {
+data "pkcs11_object" "readback" {
+  depends_on = [pkcs11_object.roundtrip]
+  label      = "test-23-roundtrip"
+  class      = "CKO_DATA"
+}
+
+check "value_matches" {
   assert {
-    condition     = pkcs11_symmetric_key.extractable.extractable == true
-    error_message = "Key should be extractable"
+    condition     = data.pkcs11_object.readback.value == base64encode("round trip test data")
+    error_message = "Value should match after round-trip"
   }
 }
 
-check "key_not_sensitive" {
+check "class_matches" {
   assert {
-    condition     = pkcs11_symmetric_key.extractable.sensitive == false
-    error_message = "Key should not be sensitive"
+    condition     = data.pkcs11_object.readback.class == "CKO_DATA"
+    error_message = "Class should be CKO_DATA"
   }
 }

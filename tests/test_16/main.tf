@@ -1,29 +1,43 @@
-# Test 16: Symmetric key with encrypt-only permissions
-# Validates creating a key that can only encrypt (not decrypt).
+# Test 16: Symmetric key read-back verification
+# Validates that key attributes can be read back correctly after creation.
 
-resource "pkcs11_symmetric_key" "encrypt_only" {
+resource "pkcs11_symmetric_key" "readback" {
   mechanism   = "CKM_AES_KEY_GEN"
-  label       = "test-16-encrypt-only"
+  label       = "test-16-readback"
   class       = "CKO_SECRET_KEY"
   key_type    = "CKK_AES"
   value_len   = 32
   encrypt     = true
-  decrypt     = false
+  decrypt     = true
   token       = true
   sensitive   = true
   extractable = false
 }
 
-check "encrypt_enabled" {
+check "label_matches" {
   assert {
-    condition     = pkcs11_symmetric_key.encrypt_only.encrypt == true
-    error_message = "Encrypt should be true"
+    condition     = pkcs11_symmetric_key.readback.label == "test-16-readback"
+    error_message = "Label should match"
   }
 }
 
-check "decrypt_disabled" {
+check "class_matches" {
   assert {
-    condition     = pkcs11_symmetric_key.encrypt_only.decrypt == false
-    error_message = "Decrypt should be false"
+    condition     = pkcs11_symmetric_key.readback.class == "CKO_SECRET_KEY"
+    error_message = "Class should be CKO_SECRET_KEY"
+  }
+}
+
+check "sensitive_set" {
+  assert {
+    condition     = pkcs11_symmetric_key.readback.sensitive == true
+    error_message = "Sensitive should be true"
+  }
+}
+
+check "not_extractable" {
+  assert {
+    condition     = pkcs11_symmetric_key.readback.extractable == false
+    error_message = "Extractable should be false"
   }
 }

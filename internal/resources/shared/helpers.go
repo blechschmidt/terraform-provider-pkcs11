@@ -285,18 +285,28 @@ func AttributeValuesEqual(a, b *pkcs11.Attribute) bool {
 }
 
 // ReadObjectIntoState queries all readable attributes from the token and writes them to state at root level.
-func ReadObjectIntoState(ctx context.Context, client *pkcs11client.Client, handle pkcs11.ObjectHandle, state *tfsdk.State) diag.Diagnostics {
-	return readObjectIntoStateAt(ctx, client, handle, state, path.Root)
+// An optional reference reader can be provided to preserve user-provided enum values (e.g. pass PlanReader during Create).
+func ReadObjectIntoState(ctx context.Context, client *pkcs11client.Client, handle pkcs11.ObjectHandle, state *tfsdk.State, ref ...AttrReader) diag.Diagnostics {
+	var r AttrReader
+	if len(ref) > 0 {
+		r = ref[0]
+	}
+	return readObjectIntoStateAt(ctx, client, handle, state, path.Root, r)
 }
 
 // ReadObjectIntoNestedState queries all readable attributes from the token and writes them to a nested block in state.
-func ReadObjectIntoNestedState(ctx context.Context, client *pkcs11client.Client, handle pkcs11.ObjectHandle, state *tfsdk.State, nestedKey string) diag.Diagnostics {
+// An optional reference reader can be provided to preserve user-provided enum values (e.g. pass PlanReader during Create).
+func ReadObjectIntoNestedState(ctx context.Context, client *pkcs11client.Client, handle pkcs11.ObjectHandle, state *tfsdk.State, nestedKey string, ref ...AttrReader) diag.Diagnostics {
+	var r AttrReader
+	if len(ref) > 0 {
+		r = ref[0]
+	}
 	return readObjectIntoStateAt(ctx, client, handle, state, func(key string) path.Path {
 		return path.Root(nestedKey).AtName(key)
-	})
+	}, r)
 }
 
-func readObjectIntoStateAt(ctx context.Context, client *pkcs11client.Client, handle pkcs11.ObjectHandle, state *tfsdk.State, pathFn func(string) path.Path) diag.Diagnostics {
+func readObjectIntoStateAt(ctx context.Context, client *pkcs11client.Client, handle pkcs11.ObjectHandle, state *tfsdk.State, pathFn func(string) path.Path, ref AttrReader) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	rawAttrs := client.GetAllObjectAttributes(handle)
@@ -319,11 +329,30 @@ func readObjectIntoStateAt(ctx context.Context, client *pkcs11client.Client, han
 			diags.Append(state.SetAttribute(ctx, attrPath, pkcs11client.EncodeHex(val))...)
 		case pkcs11client.AttrTypeUlong:
 			if def.Pkcs11Enum != nil {
-				diags.Append(state.SetAttribute(ctx, attrPath, def.Pkcs11Enum.Format(pkcs11client.BytesToUlong(val)))...)
+				hsmID := pkcs11client.BytesToUlong(val)
+				// Preserve the user's original value if it resolves to the same ID,
+				// avoiding unnecessary diffs when using prefix-less names.
+				// Check both current state and the reference (plan) if provided.
+				for _, src := range []AttrReader{StateReader{State: *state}, ref} {
+					if src == nil {
+						continue
+					}
+					var current types.String
+					src.GetAttribute(ctx, attrPath, &current)
+					if !current.IsNull() && !current.IsUnknown() {
+						currentID, err := def.Pkcs11Enum.Resolve(current.ValueString())
+						if err == nil && currentID == hsmID {
+							diags.Append(state.SetAttribute(ctx, attrPath, current.ValueString())...)
+							goto nextAttr
+						}
+					}
+				}
+				diags.Append(state.SetAttribute(ctx, attrPath, def.Pkcs11Enum.Format(hsmID))...)
 			} else {
 				diags.Append(state.SetAttribute(ctx, attrPath, int64(pkcs11client.BytesToUlong(val)))...)
 			}
 		}
+	nextAttr:
 	}
 
 	return diags
@@ -512,12 +541,11 @@ func (m EnumNormalizer) PlanModifyString(_ context.Context, req planmodifier.Str
 	if req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
 		return
 	}
-	id, err := m.Enum.Resolve(req.PlanValue.ValueString())
+	_, err := m.Enum.Resolve(req.PlanValue.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid enum value", err.Error())
 		return
 	}
-	resp.PlanValue = types.StringValue(m.Enum.Format(id))
 }
 
 // MechanismNormalizer normalizes mechanism name values to their canonical CKM_ names during planning.
@@ -535,10 +563,9 @@ func (m MechanismNormalizer) PlanModifyString(_ context.Context, req planmodifie
 	if req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
 		return
 	}
-	id, err := pkcs11client.MechanismEnum.Resolve(req.PlanValue.ValueString())
+	_, err := pkcs11client.MechanismEnum.Resolve(req.PlanValue.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid mechanism", err.Error())
 		return
 	}
-	resp.PlanValue = types.StringValue(pkcs11client.MechanismEnum.Format(id))
 }

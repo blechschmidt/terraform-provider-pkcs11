@@ -114,7 +114,7 @@ func (r *KeyPairResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	diags = r.readBothKeysIntoState(ctx, pubHandle, privHandle, &resp.State)
+	diags = r.readBothKeysIntoState(ctx, pubHandle, privHandle, &resp.State, shared.PlanReader{Plan: req.Plan})
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -187,7 +187,7 @@ func (r *KeyPairResource) Update(ctx context.Context, req resource.UpdateRequest
 		}
 	}
 
-	diags = r.readBothKeysIntoState(ctx, pubHandle, privHandle, &resp.State)
+	diags = r.readBothKeysIntoState(ctx, pubHandle, privHandle, &resp.State, shared.PlanReader{Plan: req.Plan})
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -247,15 +247,15 @@ func (r *KeyPairResource) findBothKeys(ctx context.Context, state tfsdk.State) (
 }
 
 // readBothKeysIntoState reads attributes from both keys into their respective nested state blocks.
-func (r *KeyPairResource) readBothKeysIntoState(ctx context.Context, pubHandle, privHandle pkcs11.ObjectHandle, state *tfsdk.State) diag.Diagnostics {
+func (r *KeyPairResource) readBothKeysIntoState(ctx context.Context, pubHandle, privHandle pkcs11.ObjectHandle, state *tfsdk.State, ref ...shared.AttrReader) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	diags.Append(shared.ReadObjectIntoNestedState(ctx, r.client, pubHandle, state, "public_key")...)
+	diags.Append(shared.ReadObjectIntoNestedState(ctx, r.client, pubHandle, state, "public_key", ref...)...)
 	if diags.HasError() {
 		return diags
 	}
 
-	diags.Append(shared.ReadObjectIntoNestedState(ctx, r.client, privHandle, state, "private_key")...)
+	diags.Append(shared.ReadObjectIntoNestedState(ctx, r.client, privHandle, state, "private_key", ref...)...)
 	return diags
 }
 

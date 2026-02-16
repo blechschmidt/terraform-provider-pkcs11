@@ -23,16 +23,16 @@ resource "pkcs11_key_pair" "rsa_enum_no_prefix" {
   }
 }
 
-check "pub_class_normalized" {
+check "pub_class_accepted" {
   assert {
-    condition     = pkcs11_key_pair.rsa_enum_no_prefix.public_key.class == "CKO_PUBLIC_KEY"
-    error_message = "Public key class should normalize to CKO_PUBLIC_KEY"
+    condition     = pkcs11_key_pair.rsa_enum_no_prefix.public_key.class == "PUBLIC_KEY"
+    error_message = "Public key class should accept prefix-less value PUBLIC_KEY"
   }
 }
 
-check "priv_class_normalized" {
+check "priv_class_accepted" {
   assert {
-    condition     = pkcs11_key_pair.rsa_enum_no_prefix.private_key.class == "CKO_PRIVATE_KEY"
-    error_message = "Private key class should normalize to CKO_PRIVATE_KEY"
+    condition     = pkcs11_key_pair.rsa_enum_no_prefix.private_key.class == "PRIVATE_KEY"
+    error_message = "Private key class should accept prefix-less value PRIVATE_KEY"
   }
 }

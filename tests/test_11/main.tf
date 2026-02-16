@@ -14,9 +14,9 @@ resource "pkcs11_symmetric_key" "no_prefix_mech" {
   extractable = false
 }
 
-check "mechanism_normalized" {
+check "mechanism_accepted" {
   assert {
-    condition     = pkcs11_symmetric_key.no_prefix_mech.mechanism == "CKM_AES_KEY_GEN"
-    error_message = "Mechanism should be normalized to CKM_AES_KEY_GEN"
+    condition     = pkcs11_symmetric_key.no_prefix_mech.mechanism == "AES_KEY_GEN"
+    error_message = "Mechanism should accept prefix-less value AES_KEY_GEN"
   }
 }

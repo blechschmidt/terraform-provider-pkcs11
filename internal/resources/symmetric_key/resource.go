@@ -96,7 +96,7 @@ func (r *SymmetricKeyResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State)
+	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State, shared.PlanReader{Plan: req.Plan})
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -164,7 +164,7 @@ func (r *SymmetricKeyResource) Update(ctx context.Context, req resource.UpdateRe
 		}
 	}
 
-	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State)
+	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State, shared.PlanReader{Plan: req.Plan})
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
