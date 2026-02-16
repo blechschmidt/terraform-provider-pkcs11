@@ -19,6 +19,9 @@ Terraform provider for managing cryptographic objects on PKCS#11 tokens and HSMs
 - `env` (Map of String) Additional environment variables to set for the provider process. This can be used to pass configuration to the PKCS#11 module or for debugging purposes. Values will override any conflicting environment variables set in the shell.
 - `module_path` (String) Path to the PKCS#11 shared library module. Can also be set via PKCS11_MODULE_PATH env var.
 - `pin` (String, Sensitive) User PIN for the token. Can also be set via PKCS11_PIN env var.
-- `slot_id` (Number) Slot ID to use. Mutually exclusive with token_label. Can also be set via PKCS11_SLOT_ID env var.
+- `serial_number` (String) Serial number of the token to use. Can be combined with token_label, token_manufacturer, and token_model. Mutually exclusive with slot_id. Can also be set via PKCS11_SERIAL_NUMBER env var.
+- `slot_id` (Number) Slot ID to use. Mutually exclusive with token_label, serial_number, token_manufacturer, and token_model. Can also be set via PKCS11_SLOT_ID env var.
 - `so_pin` (String, Sensitive) Security Officer PIN. Can also be set via PKCS11_SO_PIN env var.
-- `token_label` (String) Label of the token to use. Mutually exclusive with slot_id. Can also be set via PKCS11_TOKEN_LABEL env var.
+- `token_label` (String) Label of the token to use. Can be combined with serial_number, token_manufacturer, and token_model. Mutually exclusive with slot_id. Can also be set via PKCS11_TOKEN_LABEL env var.
+- `token_manufacturer` (String) Manufacturer of the token to use. Can be combined with token_label, serial_number, and token_model. Mutually exclusive with slot_id. Can also be set via PKCS11_TOKEN_MANUFACTURER env var.
+- `token_model` (String) Model of the token to use. Can be combined with token_label, serial_number, and token_manufacturer. Mutually exclusive with slot_id. Can also be set via PKCS11_TOKEN_MODEL env var.
