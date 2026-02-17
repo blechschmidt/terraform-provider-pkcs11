@@ -39,9 +39,9 @@ func (r *UnwrappedKeyResource) Metadata(_ context.Context, req resource.Metadata
 func (r *UnwrappedKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	classEnum := pkcs11client.AttributeNameToDef["class"].Pkcs11Enum
 
-	// For unwrapped keys, all PKCS#11 object attributes are Computed-only
-	// because the HSM determines them from the wrapped blob (especially with
-	// CKM_YUBICO_AES_CCM_WRAP where the template is ignored entirely).
+	// For unwrapped keys, PKCS#11 object attributes are Optional+Computed.
+	// When using standard mechanisms (e.g. CKM_AES_KEY_WRAP), the user provides
+	// a template for C_UnwrapKey. When omitted, the HSM determines the values.
 	attrs := shared.ComputedObjectAttrSchema()
 	attrs["id"] = schema.StringAttribute{
 		Computed:    true,
@@ -52,7 +52,7 @@ func (r *UnwrappedKeyResource) Schema(_ context.Context, _ resource.SchemaReques
 	}
 	attrs["mechanism"] = schema.StringAttribute{
 		Required:    true,
-		Description: "Unwrapping mechanism name (e.g., CKM_YUBICO_AES_CCM_WRAP). Accepts name with or without CKM_ prefix, or numeric value.",
+		Description: "Unwrapping mechanism name (e.g., CKM_AES_KEY_WRAP). Accepts name with or without CKM_ prefix, or numeric value.",
 		PlanModifiers: []planmodifier.String{
 			shared.MechanismNormalizer{},
 			stringplanmodifier.RequiresReplace(),
@@ -86,8 +86,9 @@ func (r *UnwrappedKeyResource) Schema(_ context.Context, _ resource.SchemaReques
 
 	resp.Schema = schema.Schema{
 		Description: "Unwraps (imports) encrypted key material onto a PKCS#11 token using C_UnwrapKey. " +
-			"The unwrapped object's attributes (label, class, key_type, etc.) are determined by the " +
-			"HSM from the wrapped blob and are exposed as computed outputs.",
+			"For standard mechanisms (e.g. CKM_AES_KEY_WRAP), provide a template with the desired " +
+			"attributes (label, class, key_type, etc.). For vendor-specific mechanisms that embed " +
+			"attributes in the wrapped blob, the template can be omitted.",
 		Attributes: attrs,
 	}
 }
@@ -138,18 +139,25 @@ func (r *UnwrappedKeyResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	// Unwrap with empty template — for CKM_YUBICO_AES_CCM_WRAP the template
-	// is ignored and attributes come from the wrapped blob.
+	// Build unwrap template from user-provided PKCS#11 attributes.
+	// Standard mechanisms (e.g. CKM_AES_KEY_WRAP) require a template;
+	// vendor-specific mechanisms may ignore it.
+	template, templateDiags := shared.AttrsFromPlan(ctx, req.Plan)
+	resp.Diagnostics.Append(templateDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	mechanism := []*pkcs11.Mechanism{pkcs11.NewMechanism(mechanismID, nil)}
-	handle, err := r.client.UnwrapKey(mechanism, unwrappingKeyHandle, wrappedBytes, nil)
+	handle, err := r.client.UnwrapKey(mechanism, unwrappingKeyHandle, wrappedBytes, template)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to unwrap key", err.Error())
 		return
 	}
 
-	// Read the unwrapped object attributes back into state (no PlanReader —
-	// the HSM determines all attribute values).
-	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State)
+	// Read the unwrapped object attributes back into state, using the plan as
+	// reference to preserve user-provided enum values.
+	diags = shared.ReadObjectIntoState(ctx, r.client, handle, &resp.State, shared.PlanReader{Plan: req.Plan})
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

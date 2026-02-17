@@ -1,9 +1,9 @@
 # Test 40: Wrap with AES-256 wrapping key and AES-256 target
 resource "pkcs11_symmetric_key" "wrapping_key" {
-  mechanism   = "CKM_GENERIC_SECRET_KEY_GEN"
+  mechanism   = "CKM_AES_KEY_GEN"
   label       = "test-40-wrapping-key"
   class       = "CKO_SECRET_KEY"
-  key_type    = "CKK_YUBICO_AES256_CCM_WRAP"
+  key_type    = "CKK_AES"
   value_len   = 32
   token       = true
   sensitive   = true
@@ -27,7 +27,7 @@ resource "pkcs11_symmetric_key" "target_key" {
 
 resource "pkcs11_wrapped_key" "wrapped" {
   depends_on         = [pkcs11_symmetric_key.wrapping_key, pkcs11_symmetric_key.target_key]
-  mechanism          = "CKM_YUBICO_AES_CCM_WRAP"
+  mechanism          = "CKM_AES_KEY_WRAP"
   wrapping_key_label = "test-40-wrapping-key"
   key_label          = "test-40-target-key"
 }

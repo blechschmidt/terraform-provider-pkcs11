@@ -176,10 +176,10 @@ data "pkcs11_signature" "sig" {
 
 # Wrap a key for export
 resource "pkcs11_symmetric_key" "wrapping_key" {
-  mechanism   = "CKM_GENERIC_SECRET_KEY_GEN"
+  mechanism   = "CKM_AES_KEY_GEN"
   label       = "my-wrapping-key"
   class       = "CKO_SECRET_KEY"
-  key_type    = "CKK_YUBICO_AES128_CCM_WRAP"
+  key_type    = "CKK_AES"
   value_len   = 16
   token       = true
   sensitive   = true
@@ -189,9 +189,22 @@ resource "pkcs11_symmetric_key" "wrapping_key" {
 }
 
 resource "pkcs11_wrapped_key" "wrapped" {
-  mechanism          = "CKM_YUBICO_AES_CCM_WRAP"
+  mechanism          = "CKM_AES_KEY_WRAP"
   wrapping_key_label = "my-wrapping-key"
   key_label          = "test-symmetric-key"
+}
+
+# Unwrap (import) a key
+resource "pkcs11_unwrapped_key" "unwrapped" {
+  mechanism            = "CKM_AES_KEY_WRAP"
+  unwrapping_key_label = "my-wrapping-key"
+  wrapped_key_material = pkcs11_wrapped_key.wrapped.wrapped_key_material
+
+  label     = "imported-key"
+  class     = "CKO_SECRET_KEY"
+  key_type  = "CKK_AES"
+  token     = true
+  sensitive = true
 }
 
 # Look up an object (with optional existence check)

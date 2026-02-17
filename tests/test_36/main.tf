@@ -1,9 +1,9 @@
 # Test 36: Wrap using prefix-less mechanism name
 resource "pkcs11_symmetric_key" "wrapping_key" {
-  mechanism   = "GENERIC_SECRET_KEY_GEN"
+  mechanism   = "AES_KEY_GEN"
   label       = "test-36-wrapping-key"
   class       = "CKO_SECRET_KEY"
-  key_type    = "CKK_YUBICO_AES128_CCM_WRAP"
+  key_type    = "CKK_AES"
   value_len   = 16
   token       = true
   sensitive   = true
@@ -28,7 +28,7 @@ resource "pkcs11_symmetric_key" "target_key" {
 # Use prefix-less mechanism name
 resource "pkcs11_wrapped_key" "wrapped" {
   depends_on         = [pkcs11_symmetric_key.wrapping_key, pkcs11_symmetric_key.target_key]
-  mechanism          = "YUBICO_AES_CCM_WRAP"
+  mechanism          = "AES_KEY_WRAP"
   wrapping_key_label = "test-36-wrapping-key"
   key_label          = "test-36-target-key"
 }

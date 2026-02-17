@@ -119,48 +119,55 @@ func ObjectAttrSchema() map[string]schema.Attribute {
 }
 
 // ComputedObjectAttrSchema returns the same PKCS#11 object attributes as
-// ObjectAttrSchema but all marked as Computed-only (not Optional). This is
-// used for resources like pkcs11_unwrapped_key where the HSM determines all
-// attribute values from the wrapped blob.
+// ObjectAttrSchema but all marked as Optional+Computed. When specified by the
+// user, they are passed as the template to C_UnwrapKey. When omitted, the HSM
+// determines the values (e.g. from the wrapped blob for vendor-specific
+// mechanisms that embed attributes in the wrapped blob).
 func ComputedObjectAttrSchema() map[string]schema.Attribute {
 	attrs := map[string]schema.Attribute{}
 
 	for _, def := range pkcs11client.ObjectAttrs {
-		desc := fmt.Sprintf("PKCS#11 attribute %s (computed from wrapped blob).", def.TFKey)
+		desc := fmt.Sprintf("PKCS#11 attribute %s. Can be set to provide an unwrap template, or left empty to be determined by the HSM.", def.TFKey)
 		switch def.AttrType {
 		case pkcs11client.AttrTypeBool:
 			attrs[def.TFKey] = schema.BoolAttribute{
+				Optional:    true,
 				Computed:    true,
 				Description: desc,
 				Sensitive:   def.Sensitive,
 			}
 		case pkcs11client.AttrTypeString:
 			attrs[def.TFKey] = schema.StringAttribute{
+				Optional:    true,
 				Computed:    true,
 				Description: desc,
 				Sensitive:   def.Sensitive,
 			}
 		case pkcs11client.AttrTypeBytes:
 			attrs[def.TFKey] = schema.StringAttribute{
+				Optional:    true,
 				Computed:    true,
-				Description: fmt.Sprintf("PKCS#11 attribute %s (base64-encoded, computed from wrapped blob).", def.TFKey),
+				Description: fmt.Sprintf("PKCS#11 attribute %s (base64-encoded).", def.TFKey),
 				Sensitive:   def.Sensitive,
 			}
 		case pkcs11client.AttrTypeHex:
 			attrs[def.TFKey] = schema.StringAttribute{
+				Optional:    true,
 				Computed:    true,
-				Description: fmt.Sprintf("PKCS#11 attribute %s (hex-encoded, computed from wrapped blob).", def.TFKey),
+				Description: fmt.Sprintf("PKCS#11 attribute %s (hex-encoded).", def.TFKey),
 				Sensitive:   def.Sensitive,
 			}
 		case pkcs11client.AttrTypeUlong:
 			if def.Pkcs11Enum != nil {
 				attrs[def.TFKey] = schema.StringAttribute{
+					Optional:    true,
 					Computed:    true,
 					Description: desc,
 					Sensitive:   def.Sensitive,
 				}
 			} else {
 				attrs[def.TFKey] = schema.Int64Attribute{
+					Optional:    true,
 					Computed:    true,
 					Description: desc,
 					Sensitive:   def.Sensitive,

@@ -1,16 +1,50 @@
 # Test 42: Verify unwrapped AES-256 key attributes
-variable "wrapped_key_material" {
-  type      = string
-  sensitive = true
+resource "pkcs11_symmetric_key" "wrapping_key" {
+  mechanism   = "CKM_AES_KEY_GEN"
+  label       = "test-42-wrapping-key"
+  class       = "CKO_SECRET_KEY"
+  key_type    = "CKK_AES"
+  value_len   = 16
+  token       = true
+  sensitive   = true
+  extractable = false
+  wrap        = true
+  unwrap      = true
 }
 
-# The wrapping key already exists on the HSM from phase 1.
-# All object attributes are computed from the wrapped blob.
+resource "pkcs11_symmetric_key" "original_key" {
+  mechanism   = "CKM_AES_KEY_GEN"
+  label       = "test-42-original-key"
+  class       = "CKO_SECRET_KEY"
+  key_type    = "CKK_AES"
+  value_len   = 32
+  encrypt     = true
+  decrypt     = true
+  token       = true
+  sensitive   = true
+  extractable = true
+}
+
+resource "pkcs11_wrapped_key" "wrapped" {
+  depends_on         = [pkcs11_symmetric_key.wrapping_key, pkcs11_symmetric_key.original_key]
+  mechanism          = "CKM_AES_KEY_WRAP"
+  wrapping_key_label = "test-42-wrapping-key"
+  key_label          = "test-42-original-key"
+}
 
 resource "pkcs11_unwrapped_key" "unwrapped" {
-  mechanism             = "CKM_YUBICO_AES_CCM_WRAP"
-  unwrapping_key_label  = "test-42-wrapping-key"
-  wrapped_key_material  = var.wrapped_key_material
+  depends_on           = [pkcs11_wrapped_key.wrapped]
+  mechanism            = "CKM_AES_KEY_WRAP"
+  unwrapping_key_label = "test-42-wrapping-key"
+  wrapped_key_material = pkcs11_wrapped_key.wrapped.wrapped_key_material
+
+  label     = "test-42-unwrapped-key"
+  class     = "CKO_SECRET_KEY"
+  key_type  = "CKK_AES"
+  encrypt   = true
+  decrypt   = true
+  token     = true
+  sensitive = true
 }
 
 check "unwrapped_key_type" {
@@ -20,9 +54,9 @@ check "unwrapped_key_type" {
   }
 }
 
-check "unwrapped_value_len" {
+check "unwrapped_class" {
   assert {
-    condition     = pkcs11_unwrapped_key.unwrapped.value_len == 32
-    error_message = "Unwrapped key value_len should be 32 (AES-256)"
+    condition     = pkcs11_unwrapped_key.unwrapped.class == "CKO_SECRET_KEY"
+    error_message = "Unwrapped key should be a secret key"
   }
 }

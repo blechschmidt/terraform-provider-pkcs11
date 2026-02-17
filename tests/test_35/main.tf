@@ -1,9 +1,9 @@
 # Test 35: Wrap two different keys with same wrapping key
 resource "pkcs11_symmetric_key" "wrapping_key" {
-  mechanism   = "CKM_GENERIC_SECRET_KEY_GEN"
+  mechanism   = "CKM_AES_KEY_GEN"
   label       = "test-35-wrapping-key"
   class       = "CKO_SECRET_KEY"
-  key_type    = "CKK_YUBICO_AES128_CCM_WRAP"
+  key_type    = "CKK_AES"
   value_len   = 16
   token       = true
   sensitive   = true
@@ -40,14 +40,14 @@ resource "pkcs11_symmetric_key" "target_key_b" {
 
 resource "pkcs11_wrapped_key" "wrapped_a" {
   depends_on         = [pkcs11_symmetric_key.wrapping_key, pkcs11_symmetric_key.target_key_a]
-  mechanism          = "CKM_YUBICO_AES_CCM_WRAP"
+  mechanism          = "CKM_AES_KEY_WRAP"
   wrapping_key_label = "test-35-wrapping-key"
   key_label          = "test-35-target-a"
 }
 
 resource "pkcs11_wrapped_key" "wrapped_b" {
   depends_on         = [pkcs11_symmetric_key.wrapping_key, pkcs11_symmetric_key.target_key_b]
-  mechanism          = "CKM_YUBICO_AES_CCM_WRAP"
+  mechanism          = "CKM_AES_KEY_WRAP"
   wrapping_key_label = "test-35-wrapping-key"
   key_label          = "test-35-target-b"
 }

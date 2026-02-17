@@ -1,9 +1,9 @@
-# Test 39: Wrap an EC private key
+# Test 39: Wrap an EC private key with CKM_AES_KEY_WRAP_PAD
 resource "pkcs11_symmetric_key" "wrapping_key" {
-  mechanism   = "CKM_GENERIC_SECRET_KEY_GEN"
+  mechanism   = "CKM_AES_KEY_GEN"
   label       = "test-39-wrapping-key"
   class       = "CKO_SECRET_KEY"
-  key_type    = "CKK_YUBICO_AES128_CCM_WRAP"
+  key_type    = "CKK_AES"
   value_len   = 16
   token       = true
   sensitive   = true
@@ -35,7 +35,7 @@ resource "pkcs11_key_pair" "ec_key" {
 
 resource "pkcs11_wrapped_key" "wrapped_ec" {
   depends_on         = [pkcs11_symmetric_key.wrapping_key, pkcs11_key_pair.ec_key]
-  mechanism          = "CKM_YUBICO_AES_CCM_WRAP"
+  mechanism          = "CKM_AES_KEY_WRAP_PAD"
   wrapping_key_label = "test-39-wrapping-key"
   key_label          = "test-39-ec-key"
   key_class          = "CKO_PRIVATE_KEY"

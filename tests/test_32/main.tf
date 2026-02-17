@@ -1,9 +1,9 @@
 # Test 32: Wrap with explicit wrapping_key_class and key_class
 resource "pkcs11_symmetric_key" "wrapping_key" {
-  mechanism   = "CKM_GENERIC_SECRET_KEY_GEN"
+  mechanism   = "CKM_AES_KEY_GEN"
   label       = "test-32-wrapping-key"
   class       = "CKO_SECRET_KEY"
-  key_type    = "CKK_YUBICO_AES128_CCM_WRAP"
+  key_type    = "CKK_AES"
   value_len   = 16
   token       = true
   sensitive   = true
@@ -27,7 +27,7 @@ resource "pkcs11_symmetric_key" "target_key" {
 
 resource "pkcs11_wrapped_key" "wrapped" {
   depends_on         = [pkcs11_symmetric_key.wrapping_key, pkcs11_symmetric_key.target_key]
-  mechanism          = "CKM_YUBICO_AES_CCM_WRAP"
+  mechanism          = "CKM_AES_KEY_WRAP"
   wrapping_key_label = "test-32-wrapping-key"
   wrapping_key_class = "CKO_SECRET_KEY"
   key_label          = "test-32-target-key"
