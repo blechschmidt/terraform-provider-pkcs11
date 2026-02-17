@@ -1,6 +1,6 @@
 # Terraform Provider for PKCS#11
 
-A Terraform provider for managing cryptographic objects (keys, certificates, data) on PKCS#11 tokens and HSMs.
+A Terraform provider for managing cryptographic objects and performing cryptographic operations on PKCS#11 tokens and HSMs.
 
 ## Requirements
 
@@ -65,6 +65,14 @@ Generates an asymmetric key pair using `C_GenerateKeyPair`. Requires a `mechanis
 
 Generates a symmetric key using `C_GenerateKey`. Requires a `mechanism`. All PKCS#11 attributes can be specified directly.
 
+### `pkcs11_wrapped_key`
+
+Wraps (exports) an existing key using `C_WrapKey`. Produces base64-encoded wrapped key material that can be stored or transferred. Requires a wrapping key label, a target key label, and a wrapping mechanism.
+
+### `pkcs11_unwrapped_key`
+
+Unwraps (imports) a previously wrapped key using `C_UnwrapKey`. Takes base64-encoded wrapped key material and imports it back onto the token. Requires an unwrapping key label, a mechanism, and the wrapped key material.
+
 ## Data Sources
 
 | Data Source            | Description                                       |
@@ -74,6 +82,9 @@ Generates a symmetric key using `C_GenerateKey`. Requires a `mechanism`. All PKC
 | `pkcs11_mechanisms`    | Supported mechanisms and key sizes                |
 | `pkcs11_object`        | Look up an object by attributes, returning all readable attributes |
 | `pkcs11_constants`     | PKCS#11 constant name-to-value mappings           |
+| `pkcs11_encrypt`       | Encrypt data using a key on the token (`C_Encrypt`) |
+| `pkcs11_decrypt`       | Decrypt data using a key on the token (`C_Decrypt`) |
+| `pkcs11_signature`     | Sign data using a key on the token (`C_Sign`)     |
 
 ## Example Usage
 
@@ -142,6 +153,47 @@ resource "pkcs11_symmetric_key" "test_key" {
   extractable = false
 }
 
+# Encrypt data with AES
+data "pkcs11_encrypt" "encrypted" {
+  mechanism = "CKM_AES_ECB"
+  key_label = "test-symmetric-key"
+  plaintext = base64encode("0123456789abcdef") # must be base64-encoded
+}
+
+# Decrypt data with AES
+data "pkcs11_decrypt" "decrypted" {
+  mechanism  = "CKM_AES_ECB"
+  key_label  = "test-symmetric-key"
+  ciphertext = data.pkcs11_encrypt.encrypted.ciphertext
+}
+
+# Sign data with RSA
+data "pkcs11_signature" "sig" {
+  mechanism = "CKM_SHA256_RSA_PKCS"
+  key_label = "test-signing-key"
+  data      = base64encode("message to sign")
+}
+
+# Wrap a key for export
+resource "pkcs11_symmetric_key" "wrapping_key" {
+  mechanism   = "CKM_GENERIC_SECRET_KEY_GEN"
+  label       = "my-wrapping-key"
+  class       = "CKO_SECRET_KEY"
+  key_type    = "CKK_YUBICO_AES128_CCM_WRAP"
+  value_len   = 16
+  token       = true
+  sensitive   = true
+  extractable = false
+  wrap        = true
+  unwrap      = true
+}
+
+resource "pkcs11_wrapped_key" "wrapped" {
+  mechanism          = "CKM_YUBICO_AES_CCM_WRAP"
+  wrapping_key_label = "my-wrapping-key"
+  key_label          = "test-symmetric-key"
+}
+
 # Look up an object (with optional existence check)
 data "pkcs11_object" "my_data" {
   label  = "my-object"
@@ -171,7 +223,7 @@ Attributes that represent PKCS#11 constants (`class`, `key_type`, `certificate_t
 - **Without prefix**: `"SECRET_KEY"`, `"AES"`, `"AES_KEY_GEN"`
 - **Numeric value**: `"3"`, `"31"`
 
-The `mechanism` attribute on `pkcs11_symmetric_key` and `pkcs11_key_pair` also supports these formats with the `CKM_` prefix.
+The `mechanism` attribute on resources (`pkcs11_symmetric_key`, `pkcs11_key_pair`, `pkcs11_wrapped_key`, `pkcs11_unwrapped_key`) and data sources (`pkcs11_encrypt`, `pkcs11_decrypt`, `pkcs11_signature`) also supports these formats with the `CKM_` prefix.
 
 Values are always normalized to the canonical full name in state (e.g., `"SECRET_KEY"` becomes `"CKO_SECRET_KEY"`).
 

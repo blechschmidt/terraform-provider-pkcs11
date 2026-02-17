@@ -39,6 +39,9 @@ type MockContext struct {
 	WrapKeyErr          error
 	UnwrapKeyErr        error
 	DeriveKeyErr        error
+	EncryptErr          error
+	DecryptErr          error
+	SignErr             error
 }
 
 type mockSlot struct {
@@ -357,6 +360,58 @@ func (m *MockContext) DeriveKey(sh pkcs11.SessionHandle, mech []*pkcs11.Mechanis
 		return 0, m.DeriveKeyErr
 	}
 	return m.CreateObject(sh, a)
+}
+
+func (m *MockContext) EncryptInit(sh pkcs11.SessionHandle, mech []*pkcs11.Mechanism, key pkcs11.ObjectHandle) error {
+	if m.EncryptErr != nil {
+		return m.EncryptErr
+	}
+	return nil
+}
+
+func (m *MockContext) Encrypt(sh pkcs11.SessionHandle, message []byte) ([]byte, error) {
+	if m.EncryptErr != nil {
+		return nil, m.EncryptErr
+	}
+	// Simple mock: reverse the bytes
+	result := make([]byte, len(message))
+	for i, b := range message {
+		result[len(message)-1-i] = b
+	}
+	return result, nil
+}
+
+func (m *MockContext) DecryptInit(sh pkcs11.SessionHandle, mech []*pkcs11.Mechanism, key pkcs11.ObjectHandle) error {
+	if m.DecryptErr != nil {
+		return m.DecryptErr
+	}
+	return nil
+}
+
+func (m *MockContext) Decrypt(sh pkcs11.SessionHandle, cipher []byte) ([]byte, error) {
+	if m.DecryptErr != nil {
+		return nil, m.DecryptErr
+	}
+	// Simple mock: reverse the bytes (inverse of Encrypt mock)
+	result := make([]byte, len(cipher))
+	for i, b := range cipher {
+		result[len(cipher)-1-i] = b
+	}
+	return result, nil
+}
+
+func (m *MockContext) SignInit(sh pkcs11.SessionHandle, mech []*pkcs11.Mechanism, key pkcs11.ObjectHandle) error {
+	if m.SignErr != nil {
+		return m.SignErr
+	}
+	return nil
+}
+
+func (m *MockContext) Sign(sh pkcs11.SessionHandle, message []byte) ([]byte, error) {
+	if m.SignErr != nil {
+		return nil, m.SignErr
+	}
+	return []byte("mock-signature"), nil
 }
 
 // matchesTemplate checks if an object matches all attributes in a search template.

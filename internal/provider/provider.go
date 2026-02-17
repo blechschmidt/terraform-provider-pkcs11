@@ -7,8 +7,11 @@ import (
 	"sync"
 
 	"blechschmidt.io/terraform-provider-pkcs11/internal/datasources/constants"
+	"blechschmidt.io/terraform-provider-pkcs11/internal/datasources/decrypt"
+	"blechschmidt.io/terraform-provider-pkcs11/internal/datasources/encrypt"
 	"blechschmidt.io/terraform-provider-pkcs11/internal/datasources/mechanisms"
 	"blechschmidt.io/terraform-provider-pkcs11/internal/datasources/object"
+	"blechschmidt.io/terraform-provider-pkcs11/internal/datasources/signature"
 	"blechschmidt.io/terraform-provider-pkcs11/internal/datasources/slots"
 	"blechschmidt.io/terraform-provider-pkcs11/internal/datasources/token_info"
 	"blechschmidt.io/terraform-provider-pkcs11/internal/pkcs11client"
@@ -217,6 +220,9 @@ func (p *Pkcs11Provider) DataSources(_ context.Context) []func() datasource.Data
 		mechanisms.NewDataSource,
 		object.NewDataSource,
 		constants.NewDataSource,
+		encrypt.NewDataSource,
+		decrypt.NewDataSource,
+		signature.NewDataSource,
 	}
 }
 

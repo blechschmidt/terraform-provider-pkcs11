@@ -35,6 +35,12 @@ type Pkcs11Context interface {
 	WrapKey(sh pkcs11.SessionHandle, m []*pkcs11.Mechanism, wrappingKey, key pkcs11.ObjectHandle) ([]byte, error)
 	UnwrapKey(sh pkcs11.SessionHandle, m []*pkcs11.Mechanism, unwrappingKey pkcs11.ObjectHandle, wrappedKey []byte, a []*pkcs11.Attribute) (pkcs11.ObjectHandle, error)
 	DeriveKey(sh pkcs11.SessionHandle, m []*pkcs11.Mechanism, baseKey pkcs11.ObjectHandle, a []*pkcs11.Attribute) (pkcs11.ObjectHandle, error)
+	EncryptInit(sh pkcs11.SessionHandle, m []*pkcs11.Mechanism, o pkcs11.ObjectHandle) error
+	Encrypt(sh pkcs11.SessionHandle, message []byte) ([]byte, error)
+	DecryptInit(sh pkcs11.SessionHandle, m []*pkcs11.Mechanism, o pkcs11.ObjectHandle) error
+	Decrypt(sh pkcs11.SessionHandle, cipher []byte) ([]byte, error)
+	SignInit(sh pkcs11.SessionHandle, m []*pkcs11.Mechanism, o pkcs11.ObjectHandle) error
+	Sign(sh pkcs11.SessionHandle, message []byte) ([]byte, error)
 }
 
 // Config holds configuration for creating a Client.
