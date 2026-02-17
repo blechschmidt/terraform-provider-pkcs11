@@ -629,6 +629,7 @@ var MechanismNameToID = map[string]uint{
 	"CKM_RSA_PKCS_TPM_1_1":               pkcs11.CKM_RSA_PKCS_TPM_1_1,
 	"CKM_RSA_PKCS_OAEP_TPM_1_1":          pkcs11.CKM_RSA_PKCS_OAEP_TPM_1_1,
 	"CKM_VENDOR_DEFINED":                 pkcs11.CKM_VENDOR_DEFINED,
+	"CKM_YUBICO_AES_CCM_WRAP":            0xD9554204,
 }
 
 // MechanismIDToName is the reverse mapping.
@@ -691,7 +692,10 @@ var KeyTypeNameToID = map[string]uint{
 	"CKK_SHA3_256_HMAC":  pkcs11.CKK_SHA3_256_HMAC,
 	"CKK_SHA3_384_HMAC":  pkcs11.CKK_SHA3_384_HMAC,
 	"CKK_SHA3_512_HMAC":  pkcs11.CKK_SHA3_512_HMAC,
-	"CKK_VENDOR_DEFINED": pkcs11.CKK_VENDOR_DEFINED,
+	"CKK_VENDOR_DEFINED":           pkcs11.CKK_VENDOR_DEFINED,
+	"CKK_YUBICO_AES128_CCM_WRAP":   0xD955421D,
+	"CKK_YUBICO_AES192_CCM_WRAP":   0xD9554229,
+	"CKK_YUBICO_AES256_CCM_WRAP":   0xD955422A,
 }
 
 // KeyTypeIDToName is the reverse mapping.

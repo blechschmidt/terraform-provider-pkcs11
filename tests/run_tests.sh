@@ -122,35 +122,35 @@ for test_name in "${TESTS[@]}"; do
 
     # Copy provider config and test files
     cp "${PROVIDER_TF}" "${work_dir}/"
-    cp "${test_dir}/main.tf" "${work_dir}/"
+    cp "${test_dir}"/*.tf "${work_dir}/"
+
+    # Copy test.sh if present (for multi-phase tests)
+    if [[ -f "${test_dir}/test.sh" ]]; then
+        cp "${test_dir}/test.sh" "${work_dir}/"
+    fi
 
     # Write tfvars
     cat > "${work_dir}/terraform.tfvars" <<EOF
 pkcs11_pin = "${PKCS11_PIN}"
 EOF
 
-    # Run terraform apply
-    apply_output=""
-    apply_ok=true
-
     cd "${work_dir}"
-    if ! apply_output=$(terraform apply -auto-approve -no-color 2>&1); then
-        apply_ok=false
-    fi
 
-    if ${apply_ok}; then
-        # Check for warnings in the apply output related to check blocks
-        if echo "${apply_output}" | grep -q "Check block assertion failed"; then
-            log_fail "${test_name}: check assertion(s) failed"
-            echo "${apply_output}" | grep -A2 "Check block assertion" | head -20
+    # If test.sh exists, use it for custom multi-phase test execution
+    if [[ -f "${work_dir}/test.sh" ]]; then
+        test_output=""
+        if ! test_output=$(bash "${work_dir}/test.sh" 2>&1); then
+            log_fail "${test_name}: test.sh failed"
+            echo "${test_output}" | tail -30
             FAILED=$((FAILED + 1))
             FAILED_TESTS+=("${test_name}")
+            # Attempt cleanup
+            terraform destroy -auto-approve -no-color >/dev/null 2>&1 || true
         else
-            # Run terraform destroy
-            destroy_output=""
-            if ! destroy_output=$(terraform destroy -auto-approve -no-color 2>&1); then
-                log_fail "${test_name}: destroy failed"
-                echo "${destroy_output}" | tail -10
+            # Check for assertion failures in output
+            if echo "${test_output}" | grep -q "Check block assertion failed"; then
+                log_fail "${test_name}: check assertion(s) failed"
+                echo "${test_output}" | grep -A2 "Check block assertion" | head -20
                 FAILED=$((FAILED + 1))
                 FAILED_TESTS+=("${test_name}")
             else
@@ -159,10 +159,43 @@ EOF
             fi
         fi
     else
-        log_fail "${test_name}: apply failed"
-        echo "${apply_output}" | tail -20
-        FAILED=$((FAILED + 1))
-        FAILED_TESTS+=("${test_name}")
+        # Default: single-phase apply + destroy
+        apply_output=""
+        apply_ok=true
+
+        if ! apply_output=$(terraform apply -auto-approve -no-color 2>&1); then
+            apply_ok=false
+        fi
+
+        if ${apply_ok}; then
+            # Check for warnings in the apply output related to check blocks
+            if echo "${apply_output}" | grep -q "Check block assertion failed"; then
+                log_fail "${test_name}: check assertion(s) failed"
+                echo "${apply_output}" | grep -A2 "Check block assertion" | head -20
+                FAILED=$((FAILED + 1))
+                FAILED_TESTS+=("${test_name}")
+                terraform destroy -auto-approve -no-color >/dev/null 2>&1 || true
+            else
+                # Run terraform destroy
+                destroy_output=""
+                if ! destroy_output=$(terraform destroy -auto-approve -no-color 2>&1); then
+                    log_fail "${test_name}: destroy failed"
+                    echo "${destroy_output}" | tail -10
+                    FAILED=$((FAILED + 1))
+                    FAILED_TESTS+=("${test_name}")
+                else
+                    log_pass "${test_name}"
+                    PASSED=$((PASSED + 1))
+                fi
+            fi
+        else
+            log_fail "${test_name}: apply failed"
+            echo "${apply_output}" | tail -20
+            FAILED=$((FAILED + 1))
+            FAILED_TESTS+=("${test_name}")
+            # Attempt cleanup even after failed apply
+            terraform destroy -auto-approve -no-color >/dev/null 2>&1 || true
+        fi
     fi
 
     # Clean up working directory
@@ -170,7 +203,7 @@ EOF
     echo ""
 
     # Pause between tests to allow YubiHSM sessions to be released
-    sleep 5
+    sleep 15
 done
 
 # Summary

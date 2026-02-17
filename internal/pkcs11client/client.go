@@ -2,6 +2,7 @@ package pkcs11client
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -96,6 +97,13 @@ func NewClientWithContext(ctx Pkcs11Context, cfg Config) (*Client, error) {
 		slotID: slotID,
 		pool:   NewSessionPool(ctx, slotID, cfg.Pin, poolSize),
 	}
+
+	// Ensure sessions are closed when the client is garbage collected.
+	// The Terraform Plugin Framework does not call a provider shutdown hook,
+	// so this finalizer ensures C_CloseSession and C_Finalize are called.
+	runtime.SetFinalizer(c, func(c *Client) {
+		c.Close()
+	})
 
 	return c, nil
 }

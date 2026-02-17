@@ -118,6 +118,60 @@ func ObjectAttrSchema() map[string]schema.Attribute {
 	return attrs
 }
 
+// ComputedObjectAttrSchema returns the same PKCS#11 object attributes as
+// ObjectAttrSchema but all marked as Computed-only (not Optional). This is
+// used for resources like pkcs11_unwrapped_key where the HSM determines all
+// attribute values from the wrapped blob.
+func ComputedObjectAttrSchema() map[string]schema.Attribute {
+	attrs := map[string]schema.Attribute{}
+
+	for _, def := range pkcs11client.ObjectAttrs {
+		desc := fmt.Sprintf("PKCS#11 attribute %s (computed from wrapped blob).", def.TFKey)
+		switch def.AttrType {
+		case pkcs11client.AttrTypeBool:
+			attrs[def.TFKey] = schema.BoolAttribute{
+				Computed:    true,
+				Description: desc,
+				Sensitive:   def.Sensitive,
+			}
+		case pkcs11client.AttrTypeString:
+			attrs[def.TFKey] = schema.StringAttribute{
+				Computed:    true,
+				Description: desc,
+				Sensitive:   def.Sensitive,
+			}
+		case pkcs11client.AttrTypeBytes:
+			attrs[def.TFKey] = schema.StringAttribute{
+				Computed:    true,
+				Description: fmt.Sprintf("PKCS#11 attribute %s (base64-encoded, computed from wrapped blob).", def.TFKey),
+				Sensitive:   def.Sensitive,
+			}
+		case pkcs11client.AttrTypeHex:
+			attrs[def.TFKey] = schema.StringAttribute{
+				Computed:    true,
+				Description: fmt.Sprintf("PKCS#11 attribute %s (hex-encoded, computed from wrapped blob).", def.TFKey),
+				Sensitive:   def.Sensitive,
+			}
+		case pkcs11client.AttrTypeUlong:
+			if def.Pkcs11Enum != nil {
+				attrs[def.TFKey] = schema.StringAttribute{
+					Computed:    true,
+					Description: desc,
+					Sensitive:   def.Sensitive,
+				}
+			} else {
+				attrs[def.TFKey] = schema.Int64Attribute{
+					Computed:    true,
+					Description: desc,
+					Sensitive:   def.Sensitive,
+				}
+			}
+		}
+	}
+
+	return attrs
+}
+
 // AttrReader abstracts reading attributes from either a Plan or State.
 type AttrReader interface {
 	GetAttribute(ctx context.Context, p path.Path, target interface{}) diag.Diagnostics

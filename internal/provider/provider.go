@@ -14,6 +14,8 @@ import (
 	key_pair_resource "blechschmidt.io/terraform-provider-pkcs11/internal/resources/key_pair"
 	object_resource "blechschmidt.io/terraform-provider-pkcs11/internal/resources/object"
 	symmetric_key_resource "blechschmidt.io/terraform-provider-pkcs11/internal/resources/symmetric_key"
+	unwrapped_key_resource "blechschmidt.io/terraform-provider-pkcs11/internal/resources/unwrapped_key"
+	wrapped_key_resource "blechschmidt.io/terraform-provider-pkcs11/internal/resources/wrapped_key"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
@@ -177,6 +179,8 @@ func (p *Pkcs11Provider) Resources(_ context.Context) []func() resource.Resource
 		object_resource.NewResource,
 		symmetric_key_resource.NewResource,
 		key_pair_resource.NewResource,
+		wrapped_key_resource.NewResource,
+		unwrapped_key_resource.NewResource,
 	}
 }
 
