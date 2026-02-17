@@ -136,30 +136,99 @@ EOF
 
     cd "${work_dir}"
 
-    # If test.sh exists, use it for custom multi-phase test execution
     if [[ -f "${work_dir}/test.sh" ]]; then
+        # Custom test script
         test_output=""
         if ! test_output=$(bash "${work_dir}/test.sh" 2>&1); then
             log_fail "${test_name}: test.sh failed"
             echo "${test_output}" | tail -30
             FAILED=$((FAILED + 1))
             FAILED_TESTS+=("${test_name}")
-            # Attempt cleanup
             terraform destroy -auto-approve -no-color >/dev/null 2>&1 || true
+        elif echo "${test_output}" | grep -q "Check block assertion failed"; then
+            log_fail "${test_name}: check assertion(s) failed"
+            echo "${test_output}" | grep -A2 "Check block assertion" | head -20
+            FAILED=$((FAILED + 1))
+            FAILED_TESTS+=("${test_name}")
         else
-            # Check for assertion failures in output
-            if echo "${test_output}" | grep -q "Check block assertion failed"; then
-                log_fail "${test_name}: check assertion(s) failed"
-                echo "${test_output}" | grep -A2 "Check block assertion" | head -20
-                FAILED=$((FAILED + 1))
-                FAILED_TESTS+=("${test_name}")
-            else
-                log_pass "${test_name}"
-                PASSED=$((PASSED + 1))
+            log_pass "${test_name}"
+            PASSED=$((PASSED + 1))
+        fi
+    elif [[ -f "${work_dir}/wrap.tf" ]]; then
+        # Two-phase unwrap test: wrap -> destroy original -> unwrap
+        # YubiHSM preserves the object ID in wrapped blobs, so the original
+        # must be deleted before unwrapping.
+        wrap_dir="$(mktemp -d)"
+        cp "${work_dir}/provider.tf" "${wrap_dir}/"
+        cp "${work_dir}/wrap.tf" "${wrap_dir}/main.tf"
+        cp "${work_dir}/terraform.tfvars" "${wrap_dir}/"
+
+        test_output=""
+        test_ok=true
+
+        # Phase 1: create keys and wrap
+        if ! test_output=$(cd "${wrap_dir}" && terraform apply -auto-approve -no-color 2>&1); then
+            log_fail "${test_name}: wrap phase apply failed"
+            echo "${test_output}" | tail -20
+            test_ok=false
+        fi
+
+        if ${test_ok}; then
+            WRAPPED_MATERIAL=$(cd "${wrap_dir}" && terraform output -raw wrapped_key_material 2>&1) || true
+
+            # Targeted destroy: remove original + wrapped, keep wrapping key
+            phase1_targets=(-target=pkcs11_wrapped_key.wrapped -target=pkcs11_symmetric_key.original_key)
+            if [[ -f "${test_dir}/phase1_targets" ]]; then
+                phase1_targets=()
+                while IFS= read -r target; do
+                    [[ -n "${target}" ]] && phase1_targets+=(-target="${target}")
+                done < "${test_dir}/phase1_targets"
+            fi
+
+            if ! test_output=$(cd "${wrap_dir}" && terraform destroy -auto-approve -no-color "${phase1_targets[@]}" 2>&1); then
+                log_fail "${test_name}: wrap phase targeted destroy failed"
+                echo "${test_output}" | tail -20
+                test_ok=false
             fi
         fi
+
+        # Phase 2: unwrap using the captured material
+        if ${test_ok}; then
+            cd "${work_dir}"
+            rm -f wrap.tf
+            if ! test_output=$(terraform apply -auto-approve -no-color -var="wrapped_key_material=${WRAPPED_MATERIAL}" 2>&1); then
+                log_fail "${test_name}: unwrap phase apply failed"
+                echo "${test_output}" | tail -20
+                test_ok=false
+            elif echo "${test_output}" | grep -q "Check block assertion failed"; then
+                log_fail "${test_name}: check assertion(s) failed"
+                echo "${test_output}" | grep -A2 "Check block assertion" | head -20
+                test_ok=false
+            fi
+        fi
+
+        if ${test_ok}; then
+            cd "${work_dir}"
+            if ! test_output=$(terraform destroy -auto-approve -no-color -var="wrapped_key_material=${WRAPPED_MATERIAL}" 2>&1); then
+                log_fail "${test_name}: unwrap phase destroy failed"
+                echo "${test_output}" | tail -10
+                test_ok=false
+            fi
+        fi
+
+        if ${test_ok}; then
+            log_pass "${test_name}"
+            PASSED=$((PASSED + 1))
+        else
+            FAILED=$((FAILED + 1))
+            FAILED_TESTS+=("${test_name}")
+        fi
+
+        # Always clean up wrapping key from HSM
+        cd "${wrap_dir}" 2>/dev/null && terraform destroy -auto-approve -no-color >/dev/null 2>&1 || true
+        rm -rf "${wrap_dir}"
     else
-        # Default: single-phase apply + destroy
+        # Single-phase apply + destroy
         apply_output=""
         apply_ok=true
 
@@ -168,7 +237,6 @@ EOF
         fi
 
         if ${apply_ok}; then
-            # Check for warnings in the apply output related to check blocks
             if echo "${apply_output}" | grep -q "Check block assertion failed"; then
                 log_fail "${test_name}: check assertion(s) failed"
                 echo "${apply_output}" | grep -A2 "Check block assertion" | head -20
@@ -176,7 +244,6 @@ EOF
                 FAILED_TESTS+=("${test_name}")
                 terraform destroy -auto-approve -no-color >/dev/null 2>&1 || true
             else
-                # Run terraform destroy
                 destroy_output=""
                 if ! destroy_output=$(terraform destroy -auto-approve -no-color 2>&1); then
                     log_fail "${test_name}: destroy failed"
@@ -193,7 +260,6 @@ EOF
             echo "${apply_output}" | tail -20
             FAILED=$((FAILED + 1))
             FAILED_TESTS+=("${test_name}")
-            # Attempt cleanup even after failed apply
             terraform destroy -auto-approve -no-color >/dev/null 2>&1 || true
         fi
     fi
