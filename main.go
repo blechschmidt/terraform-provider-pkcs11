@@ -17,13 +17,14 @@ func main() {
 	flag.BoolVar(&debug, "debug", false, "set to true to run the provider with support for debuggers like delve")
 	flag.Parse()
 
+	defer provider.RunCleanup()
+
 	opts := providerserver.ServeOpts{
 		Address: "registry.terraform.io/blechschmidt/pkcs11",
 		Debug:   debug,
 	}
 
-	err := providerserver.Serve(context.Background(), provider.New(version), opts)
-	if err != nil {
-		log.Fatal(err.Error())
+	if err := providerserver.Serve(context.Background(), provider.New(version), opts); err != nil {
+		log.Println(err.Error())
 	}
 }

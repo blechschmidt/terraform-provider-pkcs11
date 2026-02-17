@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strconv"
+	"sync"
 
 	"blechschmidt.io/terraform-provider-pkcs11/internal/datasources/constants"
 	"blechschmidt.io/terraform-provider-pkcs11/internal/datasources/mechanisms"
@@ -24,6 +25,29 @@ import (
 )
 
 var _ provider.Provider = &Pkcs11Provider{}
+
+// cleanupFuncs holds functions to call on provider shutdown.
+var (
+	cleanupMu    sync.Mutex
+	cleanupFuncs []func()
+)
+
+// RegisterCleanup registers a function to be called on provider shutdown.
+func RegisterCleanup(fn func()) {
+	cleanupMu.Lock()
+	defer cleanupMu.Unlock()
+	cleanupFuncs = append(cleanupFuncs, fn)
+}
+
+// RunCleanup runs all registered cleanup functions.
+func RunCleanup() {
+	cleanupMu.Lock()
+	defer cleanupMu.Unlock()
+	for _, fn := range cleanupFuncs {
+		fn()
+	}
+	cleanupFuncs = nil
+}
 
 // Pkcs11Provider implements the PKCS#11 Terraform provider.
 type Pkcs11Provider struct {
@@ -169,6 +193,8 @@ func (p *Pkcs11Provider) Configure(ctx context.Context, req provider.ConfigureRe
 		resp.Diagnostics.AddError("Failed to initialize PKCS#11 client", err.Error())
 		return
 	}
+
+	RegisterCleanup(func() { client.Close() })
 
 	resp.DataSourceData = client
 	resp.ResourceData = client

@@ -45,11 +45,12 @@ func (p *SessionPool) Put(sh pkcs11.SessionHandle) {
 	}
 }
 
-// CloseAll drains the pool and closes all sessions.
+// CloseAll drains the pool, logs out, and closes all sessions.
 func (p *SessionPool) CloseAll() {
 	for {
 		select {
 		case sh := <-p.pool:
+			p.ctx.Logout(sh)
 			p.ctx.CloseSession(sh)
 		default:
 			return

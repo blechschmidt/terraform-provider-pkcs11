@@ -31,8 +31,6 @@ terraform destroy -auto-approve -no-color \
   -target=pkcs11_key_pair.rsa_key
 cd "${ORIG_DIR}"
 
-# Allow YubiHSM sessions to be released before phase 2
-sleep 5
 
 # Phase 2: unwrap using the captured material
 # Remove wrap.tf so terraform only sees main.tf + provider.tf

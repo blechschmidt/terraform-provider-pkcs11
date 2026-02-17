@@ -202,8 +202,6 @@ EOF
     rm -rf "${work_dir}"
     echo ""
 
-    # Pause between tests to allow YubiHSM sessions to be released
-    sleep 15
 done
 
 # Summary
